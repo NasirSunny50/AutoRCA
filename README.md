@@ -215,4 +215,11 @@ returns an `AnalysisResult`, and register it in
 ```
 
 ---
+
+## 📄 License
+
+Copyright © 2026 **Kona Software Lab LTD**. All rights reserved.
+This software is proprietary; see [LICENSE](LICENSE) for terms.
+
+---
 *Free AI: Google Gemini · Offline fallback: built-in heuristic engine · No paid services required.*
