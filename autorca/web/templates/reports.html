@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}All Reports{% endblock %}
+{% block content %}
+<div class="hero">
+  <h1>All Reports</h1>
+  <p>Every log AutoRCA has analyzed. Click any row for the full root-cause breakdown.</p>
+</div>
+
+<form class="searchbar" method="get" action="{{ url_for('reports') }}">
+  <input type="text" name="q" value="{{ search }}" placeholder="Search by file name, error type, category, or summary…" autofocus>
+  <button class="btn" type="submit">Search</button>
+  {% if search %}<a class="btn ghost" style="display:grid;place-items:center" href="{{ url_for('reports') }}">Clear</a>{% endif %}
+</form>
+
+<div class="panel">
+  <h2>📋 Results <span class="count">{{ rows|length }} report{{ '' if rows|length==1 else 's' }}</span></h2>
+  <div class="body">
+    {% if rows %}
+      <div class="rlist">
+        {% for r in rows %}
+        <a class="rrow" href="{{ url_for('report_detail', report_id=r.id) }}">
+          <div class="ic">{{ '⚠️' if r.status=='processed' and r.category not in ['no error','n/a'] else ('✅' if r.category=='no error' else ('💥' if r.status=='failed' else '📄')) }}</div>
+          <div class="meta">
+            <div class="name">{{ r.file_name }}</div>
+            <div class="sum">{{ r.summary or r.error_message or 'No summary' }}</div>
+          </div>
+          {% if r.level %}<span class="badge conf-na" title="Level">{{ level_icon(r.level) }} {{ r.level }}</span>{% endif %}
+          <span class="chip {{ r.category_class }}">{{ r.category_label }}</span>
+          <span class="badge {{ r.confidence_class }}">{{ r.confidence or 'n/a' }}</span>
+          <div class="when">{{ r.processed_short }}</div>
+        </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <div class="big">🔍</div>
+        <p>{{ 'No reports match “%s”.' % search if search else 'No reports yet. Start the monitor and drop a log file in to begin.' }}</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

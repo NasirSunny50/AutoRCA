@@ -1,0 +1,29 @@
+# ---- Secrets ----
+.env
+
+# ---- Runtime state ----
+autorca.db
+autorca_service.log
+*.log
+
+# ---- Input logs (may contain sensitive/production data) ----
+# Keep the folder, ignore everything dropped into it.
+Error Log File/*
+!Error Log File/.gitkeep
+
+# ---- Generated & sample reports (may embed log data) ----
+# Keep the folder, ignore the report files.
+reports/*
+!reports/.gitkeep
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---- Editor/OS ----
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

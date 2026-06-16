@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "autorca-portal",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["webapp.py", "--port", "5058"],
+      "port": 5058
+    }
+  ]
+}

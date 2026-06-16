@@ -1,0 +1,8 @@
+# AutoRCA - Automated Log Monitoring & Error Analysis System
+# Core dependencies (all free / open-source)
+
+watchdog>=4.0.0        # cross-platform filesystem event monitoring
+PyYAML>=6.0            # config file parsing
+python-dotenv>=1.0.0  # load API keys from .env
+requests>=2.31.0      # Gemini REST API calls (no fragile SDK dependency)
+Flask>=3.0.0          # web portal / dashboard for viewing analyses

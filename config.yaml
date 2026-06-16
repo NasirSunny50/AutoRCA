@@ -1,0 +1,47 @@
+# ============================================================================
+# AutoRCA Configuration
+# ============================================================================
+# Edit these values to change behaviour. Secrets (API keys) live in .env.
+# ----------------------------------------------------------------------------
+
+monitoring:
+  # Folder to watch for incoming log files (relative to project root or absolute)
+  watch_dir: "Error Log File"
+  # Watch sub-folders too
+  recursive: true
+  # File extensions that will be analyzed
+  extensions: [".log", ".txt", ".out", ".trace"]
+  # Seconds a file's size must stay unchanged before it's considered "complete"
+  # (prevents reading a file that's still being written to)
+  stability_seconds: 2
+  # How often (seconds) the folder is re-checked for new/changed files
+  # (this runs in addition to instant live filesystem events)
+  poll_interval_seconds: 30
+
+processing:
+  # Sub-folder (inside watch_dir) where processed log files are moved
+  processed_subdir: "processed"
+  # Where generated reports are written
+  reports_dir: "reports"
+  # SQLite database that tracks processing history (for restart recovery)
+  db_path: "autorca.db"
+  # Max characters of raw log sent to the AI (keeps token usage low & free-tier safe)
+  max_excerpt_chars: 16000
+
+ai:
+  # Provider: "gemini" | "heuristic"
+  #   gemini    -> Google Gemini free tier (needs GEMINI_API_KEY in .env)
+  #   heuristic -> offline rule engine, no API key, no internet
+  provider: "gemini"
+  # Gemini model id (free tier). gemini-2.5-flash is current, strong & generous.
+  # (Tip: if a model returns HTTP 429 "limit: 0", that model isn't enabled on
+  #  your key's project — try gemini-flash-latest or gemini-2.5-flash-lite.)
+  model: "gemini-2.5-flash"
+  # Request timeout in seconds
+  timeout_seconds: 60
+  # If the AI call fails, fall back to the offline heuristic engine
+  fallback_to_heuristic: true
+
+logging:
+  level: "INFO"            # DEBUG | INFO | WARNING | ERROR
+  file: "autorca_service.log"

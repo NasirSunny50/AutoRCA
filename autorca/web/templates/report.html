@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}{{ r.file_name }}{% endblock %}
+{% set a = r.analysis %}
+{% set lvl = (a.level or r.level or '') %}
+{% block content %}
+<a class="back" href="{{ url_for('reports') }}">← Back to all reports</a>
+
+<!-- ============ AT-A-GLANCE VERDICT ============ -->
+<div class="verdict">
+  <div class="verdict-top">
+    <span class="badge {{ r.confidence_class }}">Confidence: {{ r.confidence or 'n/a' }}</span>
+    <span class="chip {{ r.category_class }}">{{ r.category_label }}</span>
+    <span class="when">{{ r.file_name }} · {{ r.processed_short }}</span>
+  </div>
+
+  <div class="verdict-q">What's the problem?</div>
+  <h1 class="verdict-h1">{{ a.summary or r.summary or 'Analysis' }}</h1>
+  {% if a.simple_explanation %}
+  <p class="verdict-plain">💬 {{ a.simple_explanation }}</p>
+  {% endif %}
+
+  <!-- LEVEL VISUALIZER -->
+  <div class="lvl-wrap">
+    <div class="lvl-title">Where is the issue?</div>
+    <div class="lvl-track">
+      {% for name, icon, cls in LEVELS %}
+        {% set on = (name.lower() == lvl.lower()) %}
+        <div class="lvl-box {{ cls }} {{ 'on' if on else 'off' }}">
+          <div class="lvl-ic">{{ icon }}</div>
+          <div class="lvl-name">{{ name }}</div>
+          {% if on %}<div class="lvl-flag">● affected</div>{% endif %}
+        </div>
+        {% if not loop.last %}<div class="lvl-arrow">→</div>{% endif %}
+      {% endfor %}
+    </div>
+    {% if a.level_reason %}<div class="lvl-why">{{ a.level_reason }}</div>{% endif %}
+  </div>
+</div>
+
+<!-- ============ AFFECTED ENDPOINTS (grouped by reason) ============ -->
+{% if r.groups %}
+{% set single = (r.incidents|length == 1) %}
+<div class="affected-head">
+  <span class="ah-title">🎯 Affected Endpoint{{ '' if single else 's' }}</span>
+  <span class="ah-sub">{{ r.incidents|length }} endpoint{{ '' if single else 's' }} ·
+    {{ r.groups|length }} distinct reason{{ '' if r.groups|length==1 else 's' }}</span>
+</div>
+
+{% for g in r.groups %}
+{% set ex = g.explanation %}
+<div class="reason-group">
+  <div class="rg-head">
+    <span class="rg-reason">{{ ex.title or g.reason }}</span>
+    {% if ex.level %}<span class="badge conf-na">{{ level_icon(ex.level) }} {{ ex.level }}</span>{% endif %}
+    <span class="rg-count">{{ g.endpoints }} endpoint{{ '' if g.endpoints==1 else 's' }} · {{ g.count }}×</span>
+  </div>
+  {% if ex.simple_explanation %}<p class="rg-plain">💬 {{ ex.simple_explanation }}</p>{% endif %}
+  <div class="rg-meta">
+    {% if ex.root_cause %}<div><b>Why:</b> {{ ex.root_cause }}</div>{% endif %}
+    {% if ex.fix %}<div class="rg-fix"><b>Fix:</b> {{ ex.fix }}</div>{% endif %}
+    <div class="rg-code">reason code: <code>{{ g.reason }}</code></div>
+  </div>
+
+  {% for inc in g.incidents %}
+  <details class="ep-detail" {{ 'open' if single }}>
+    <summary>
+      {% if inc.method %}<span class="ep-method m-{{ inc.method|lower }}">{{ inc.method }}</span>{% endif %}
+      <span class="ep-path">{{ inc.path }}</span>
+      <span class="status-pill {{ 'bad' if inc.status[:1] in ['4','5'] else 'ok' }}">{{ inc.status }}</span>
+      {% if inc.count > 1 %}<span class="ep-times">×{{ inc.count }}</span>{% endif %}
+    </summary>
+    <div class="rr-grid">
+      <div class="rr-card req">
+        <div class="rr-head">➡️ Request</div>
+        {% if inc.request_body %}<pre class="rr-body">{{ inc.request_body }}</pre>
+        {% else %}<div class="rr-empty">No request body captured.</div>{% endif %}
+      </div>
+      <div class="rr-card res">
+        <div class="rr-head">⬅️ Response <span class="status-pill {{ 'bad' if inc.status[:1] in ['4','5'] else 'ok' }}">{{ inc.status }}</span></div>
+        {% if inc.response_body %}<pre class="rr-body">{{ inc.response_body }}</pre>
+        {% else %}<div class="rr-empty">No response body captured.</div>{% endif %}
+      </div>
+    </div>
+  </details>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% elif r.endpoint %}
+<!-- fallback: single endpoint with no captured incident bodies -->
+{% set ep = r.endpoint.split(' ', 1) %}
+<div class="endpoint-card">
+  <div class="ep-label">🎯 Endpoint</div>
+  <div class="ep-row">
+    {% if ep|length > 1 %}<span class="ep-method m-{{ ep[0]|lower }}">{{ ep[0] }}</span>{% endif %}
+    <span class="ep-path">{{ ep[1] if ep|length > 1 else r.endpoint }}</span>
+    {% if r.response_status %}<span class="status-pill {{ 'bad' if r.response_status[:1] in ['4','5'] else 'ok' }}">→ {{ r.response_status }}</span>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ============ WHAT / WHY / FIX ============ -->
+<div class="wwf">
+  <div class="wwf-card">
+    <div class="wwf-h"><span class="wwf-ic blue">📖</span> What happened</div>
+    <p>{{ a.what_happened or a.summary or '—' }}</p>
+  </div>
+  <div class="wwf-card cause">
+    <div class="wwf-h"><span class="wwf-ic red">🎯</span> Root cause — why it broke</div>
+    <p>{{ a.root_cause or a.why_it_happened or '—' }}</p>
+  </div>
+  <div class="wwf-card impact">
+    <div class="wwf-h"><span class="wwf-ic amber">💥</span> Impact</div>
+    <p>{{ a.impact or '—' }}</p>
+  </div>
+</div>
+
+{% if a.resolution_steps %}
+<div class="section fix">
+  <h3>🛠️ How to fix it</h3>
+  <ol class="steps">{% for s in a.resolution_steps %}<li>{{ s }}</li>{% endfor %}</ol>
+</div>
+{% endif %}
+
+<!-- ============ DETAILS (secondary, collapsible) ============ -->
+<details class="more">
+  <summary>🔬 Technical details &amp; timeline</summary>
+
+  <div class="kv">
+    <div class="item"><div class="k">Level</div><div class="v">{{ lvl or 'n/a' }}</div></div>
+    <div class="item"><div class="k">Error Type</div><div class="v">{{ a.error_type or 'n/a' }}</div></div>
+    <div class="item"><div class="k">Exception Class</div><div class="v mono">{{ a.exception_class or 'n/a' }}</div></div>
+    <div class="item"><div class="k">Affected Component</div><div class="v">{{ a.affected_component or 'n/a' }}</div></div>
+    <div class="item"><div class="k">Failure Point</div><div class="v mono">{{ a.failure_point or 'n/a' }}</div></div>
+    <div class="item"><div class="k">Probable Trigger</div><div class="v">{{ a.probable_trigger or 'n/a' }}</div></div>
+  </div>
+
+  <div class="cols" style="margin-top:16px;">
+    {% if a.sequence_of_events %}
+    <div class="section"><h3>🔗 Sequence of events</h3>
+      <ul class="timeline">{% for s in a.sequence_of_events %}<li>{{ s }}</li>{% endfor %}</ul>
+    </div>{% endif %}
+    {% if a.cascading_failures %}
+    <div class="section"><h3>🌊 Cascading failures</h3>
+      <ul class="timeline cascade">{% for s in a.cascading_failures %}<li>{{ s }}</li>{% endfor %}</ul>
+    </div>{% endif %}
+  </div>
+
+  {% if a.confidence_reason %}
+  <div class="section"><h3>🧪 Why this confidence</h3>
+    <p><span class="badge {{ r.confidence_class }}">{{ r.confidence }}</span> &nbsp; {{ a.confidence_reason }}</p>
+  </div>{% endif %}
+
+  <div style="padding:6px 4px;color:var(--muted-2);font-size:12.5px;">
+    Engine: <b>{{ r.engine or 'n/a' }}</b>
+    {% if r.report_path %} · <a style="color:var(--accent)" href="{{ url_for('download', report_id=r.id) }}">⬇ Download full Markdown report</a>{% endif %}
+  </div>
+</details>
+{% endblock %}

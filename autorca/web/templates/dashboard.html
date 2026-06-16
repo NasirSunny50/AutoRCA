@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% macro report_row(r) %}
+  <a class="rrow" href="{{ url_for('report_detail', report_id=r.id) }}">
+    <div class="ic">{{ '⚠️' if r.status=='processed' and r.category not in ['no error','n/a'] else ('✅' if r.category=='no error' else ('💥' if r.status=='failed' else '📄')) }}</div>
+    <div class="meta">
+      <div class="name">{{ r.file_name }}</div>
+      <div class="sum">{{ r.summary or r.error_message or 'No summary' }}</div>
+    </div>
+    {% if r.level %}<span class="badge conf-na" title="Level">{{ level_icon(r.level) }} {{ r.level }}</span>{% endif %}
+    <span class="chip {{ r.category_class }}">{{ r.category_label }}</span>
+    <span class="badge {{ r.confidence_class }}">{{ r.confidence or 'n/a' }}</span>
+    <div class="when">{{ r.processed_short }}</div>
+  </a>
+{% endmacro %}
+
+{% block content %}
+<div class="hero">
+  <h1>Dashboard <span class="live"><span class="dot"></span> live</span></h1>
+  <p>Automated root-cause analysis of incoming error logs.</p>
+</div>
+
+<div class="grid stats">
+  <div class="stat">
+    <div class="label">Total Analyzed</div>
+    <div class="value">{{ stats.total }}</div>
+    <div class="sub">log files processed</div>
+  </div>
+  <div class="stat">
+    <div class="label">Successful</div>
+    <div class="value green">{{ stats.by_status.get('processed', 0) }}</div>
+    <div class="sub">reports generated</div>
+  </div>
+  <div class="stat">
+    <div class="label">Failed</div>
+    <div class="value {{ 'red' if stats.by_status.get('failed', 0) else '' }}">{{ stats.by_status.get('failed', 0) }}</div>
+    <div class="sub">could not analyze</div>
+  </div>
+  <div class="stat">
+    <div class="label">High Confidence</div>
+    <div class="value cyan">{{ stats.by_confidence.get('High', 0) }}</div>
+    <div class="sub">strongly evidenced</div>
+  </div>
+</div>
+
+<div class="cols">
+  <div class="panel">
+    <h2>🕑 Recent Analyses <span class="count">{{ recent|length }} shown</span></h2>
+    <div class="body">
+      {% if recent %}
+        <div class="rlist">
+          {% for r in recent %}{{ report_row(r) }}{% endfor %}
+        </div>
+      {% else %}
+        <div class="empty">
+          <div class="big">📭</div>
+          <p>No analyses yet. Drop a log into <code>Error Log File/</code> and start the monitor with <code>python main.py</code>.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div class="panel">
+      <h2>🧭 By Level</h2>
+      <div class="body">
+        {% set total_lvl = stats.by_level.values()|sum %}
+        {% if total_lvl %}
+          {% for name, icon, cls in LEVELS %}
+            {% set n = stats.by_level.get(name, 0) %}
+            <div class="bar-row">
+              <div class="top"><span>{{ icon }} {{ name }}</span><span class="n">{{ n }}</span></div>
+              <div class="bar"><span style="width: {{ (n / total_lvl * 100)|round(0,'floor') if total_lvl else 0 }}%"></span></div>
+            </div>
+          {% endfor %}
+        {% else %}<div class="empty" style="padding:24px"><p>No data yet.</p></div>{% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>🎯 Confidence</h2>
+      <div class="body">
+        {% set total_conf = stats.by_confidence.values()|sum %}
+        {% if total_conf %}
+          {% for lvl, cls in [('High','green'), ('Medium','amber'), ('Low','red')] %}
+            {% set n = stats.by_confidence.get(lvl, 0) %}
+            <div class="bar-row">
+              <div class="top"><span>{{ lvl }}</span><span class="n">{{ n }}</span></div>
+              <div class="bar {{ cls }}"><span style="width: {{ (n / total_conf * 100)|round(0,'floor') if total_conf else 0 }}%"></span></div>
+            </div>
+          {% endfor %}
+        {% else %}<div class="empty" style="padding:24px"><p>No data yet.</p></div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Auto-refresh the dashboard so new analyses appear without a manual reload.
+  setTimeout(() => location.reload(), 12000);
+</script>
+{% endblock %}
