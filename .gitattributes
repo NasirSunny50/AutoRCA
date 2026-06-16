@@ -1,0 +1,15 @@
+# Treat these as binary — never apply line-ending or text conversion.
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.ico  binary
+*.db   binary
+
+# Normalize line endings for text source files.
+*.py   text
+*.md   text
+*.html text
+*.css  text
+*.yaml text
+*.txt  text
