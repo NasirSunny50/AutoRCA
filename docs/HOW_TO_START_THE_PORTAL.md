@@ -11,8 +11,11 @@ AutoRCA has **two** programs:
 
 | Program | What it is | How to start it |
 |---------|------------|-----------------|
-| **Portal** | The website where you **view** the analysis results in your browser. | `python webapp.py` or `Start Portal.bat` |
-| **Monitor** | The background worker that **watches the folder** and analyses new log files. | `python main.py` or `Start Monitor.bat` |
+| **Portal** | The website where you **view** the analysis results in your browser. | `python webapp.py` |
+| **Monitor** | The background worker that **watches the folder** and analyses new log files. | `python main.py` |
+
+> 💡 **The easy way:** double-click **`scripts/Start AutoRCA.bat`** to start
+> **both** at once — it finds Python automatically and opens your browser.
 
 > They are independent. The **Portal** shows results; the **Monitor** produces
 > them. You can run one or both. This guide is mainly about the **Portal**.
@@ -45,7 +48,7 @@ AutoRCA has **two** programs:
 ## The easy way — double-click
 
 1. Open the **`AutoRCA`** folder in File Explorer.
-2. **Double-click `Start Portal.bat`.**
+2. **Double-click `scripts\Start AutoRCA.bat`.**
 3. A black window opens and your **browser launches automatically** at
    **http://localhost:5000**.
 4. **Keep the black window open** while you use the portal.
@@ -60,7 +63,7 @@ That's it.
 1. Open **PowerShell** or **Command Prompt**.
 2. Go to the project folder:
    ```
-   cd F:\Personal_Passive_Income\AutoRCA
+   cd D:\Projects\Personal\AutoRCA\AutoRCA
    ```
 3. Start the portal:
    ```
@@ -85,7 +88,7 @@ That's it.
 If you also want new log files to be analysed automatically, start the Monitor in
 a **second** window:
 
-- Double-click **`Start Monitor.bat`**, **or**
+- Double-click **`scripts\Start AutoRCA.bat`** (starts the monitor too), **or**
 - In a new terminal: `python main.py`
 
 Then drop any `.log`, `.txt`, `.out`, or `.trace` file into the
@@ -142,8 +145,8 @@ the portal (the dashboard refreshes on its own).
 
 | I want to… | Do this |
 |------------|---------|
-| Open the portal | Double-click `Start Portal.bat` → browser opens at http://localhost:5000 |
-| Analyse new logs | Double-click `Start Monitor.bat`, then drop files into `Error Log File` |
+| Open the portal | Double-click `scripts\Start AutoRCA.bat` → browser opens at http://localhost:5000 |
+| Analyse new logs | The same launcher starts the monitor too; drop files into `Error Log File` |
 | Stop the portal | Close its window, or press `Ctrl + C` in it |
 | Use a different port | `python webapp.py --port 8080` |
 | Open on another device on the network | `python webapp.py --host 0.0.0.0`, then visit `http://<this-PC-IP>:5000` |

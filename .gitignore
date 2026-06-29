@@ -17,7 +17,7 @@ reports/*
 !reports/.gitkeep
 
 # ---- Docs: publish the compiled PDF, not its Markdown source ----
-TECHNICAL_DOCUMENTATION.md
+docs/TECHNICAL_DOCUMENTATION.md
 
 # ---- Python ----
 __pycache__/

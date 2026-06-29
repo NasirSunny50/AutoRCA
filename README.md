@@ -48,6 +48,12 @@ for real output generated from the included API-gateway log.
 
 ## 🚀 Quick start
 
+**Easiest (Windows):** double-click **`scripts/Start AutoRCA.bat`** — it finds
+Python (even if not on your PATH), installs dependencies on first run, starts the
+monitor and the web portal, and opens the dashboard in your browser.
+
+**Manual:**
+
 ```powershell
 # 1. Install dependencies
 python -m pip install -r requirements.txt
@@ -180,6 +186,11 @@ AutoRCA/
 ├─ Error Log File/         # ◄── drop logs here  (watched)
 │  └─ processed/           #      processed logs moved here
 ├─ reports/                # generated RCA reports
+├─ scripts/
+│  └─ Start AutoRCA.bat    # one-click launcher (monitor + portal + browser)
+├─ docs/
+│  ├─ TECHNICAL_DOCUMENTATION.pdf   # full technical write-up
+│  └─ HOW_TO_START_THE_PORTAL.md    # step-by-step portal guide
 └─ autorca/
    ├─ config.py            # config + .env loader
    ├─ database.py          # SQLite processing history + structured analyses
