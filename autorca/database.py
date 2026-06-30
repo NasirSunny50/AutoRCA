@@ -44,6 +44,13 @@ CREATE TABLE IF NOT EXISTS processed_files (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_content_hash ON processed_files(content_hash);
 CREATE INDEX IF NOT EXISTS idx_status ON processed_files(status);
+
+-- Small key/value store for runtime settings shared between the portal and the
+-- monitor (e.g. the active AI engine selected from the portal dropdown).
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 # Columns added after the initial release; applied to pre-existing databases.
@@ -181,6 +188,23 @@ class Database:
                     incidents_json,
                     analysis_json,
                 ),
+            )
+            self._conn.commit()
+
+    # ------------------------------------------------------------------ settings
+    def get_setting(self, key: str, default: Optional[str] = None) -> Optional[str]:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value FROM settings WHERE key = ?", (key,)
+            ).fetchone()
+        return row["value"] if row else default
+
+    def set_setting(self, key: str, value: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, value),
             )
             self._conn.commit()
 

@@ -23,6 +23,17 @@
       <nav class="nav">
         <a href="{{ url_for('dashboard') }}" class="{{ 'active' if active=='dashboard' }}">Dashboard</a>
         <a href="{{ url_for('reports') }}" class="{{ 'active' if active=='reports' }}">All Reports</a>
+        <label class="engine-pick" title="AI model used for new analyses">
+          <span class="engine-ic">🧠</span>
+          <select id="engineSelect" aria-label="Model selection">
+            {% for o in engine_options %}
+              <option value="{{ o.id }}" {{ 'selected' if o.id == active_engine.id }}>{{ o.label }}</option>
+            {% endfor %}
+            {% if active_engine.id == 'custom' %}
+              <option value="custom" selected>{{ active_engine.label }}</option>
+            {% endif %}
+          </select>
+        </label>
         <button id="themeBtn" class="theme-toggle" type="button" title="Toggle light / dark mode" aria-label="Toggle theme">
           <span class="ic-dark">🌙</span><span class="ic-light">☀️</span>
         </button>
@@ -33,6 +44,7 @@
     {% block content %}{% endblock %}
     <div class="foot">AutoRCA — Automated Log Monitoring &amp; Error Analysis · Kona Software Lab LTD</div>
   </div>
+  <div id="engineToast" class="engine-toast" role="status" aria-live="polite"></div>
   <script>
     (function(){
       var btn = document.getElementById('themeBtn');
@@ -41,6 +53,38 @@
         var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', cur);
         try { localStorage.setItem('autorca-theme', cur); } catch(e){}
+      });
+    })();
+  </script>
+  <script>
+    // Model selection: switch the active AI engine for new analyses.
+    (function(){
+      var sel = document.getElementById('engineSelect');
+      var toast = document.getElementById('engineToast');
+      if(!sel) return;
+      var toastTimer;
+      function showToast(msg, ok){
+        if(!toast) return;
+        toast.textContent = msg;
+        toast.className = 'engine-toast show' + (ok === false ? ' err' : '');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function(){ toast.className = 'engine-toast'; }, 3800);
+      }
+      sel.addEventListener('change', function(){
+        var id = sel.value;
+        sel.disabled = true;
+        fetch('{{ url_for("api_set_provider") }}', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({engine: id})
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          sel.disabled = false;
+          if(d.ok){ showToast('Switched to ' + d.engine.label + ' — applies to new analyses', true); }
+          else { showToast('Switch failed: ' + (d.error || 'error'), false); }
+        })
+        .catch(function(){ sel.disabled = false; showToast('Switch failed (network)', false); });
       });
     })();
   </script>

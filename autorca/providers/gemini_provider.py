@@ -11,9 +11,8 @@ dropped silently.
 """
 from __future__ import annotations
 
-import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import requests
 
@@ -21,96 +20,16 @@ from ..config import Config
 from ..log_parser import ErrorDigest
 from .base import AnalysisProvider, AnalysisResult
 from .heuristic_provider import HeuristicProvider
+from ._rca_shared import (
+    SYSTEM_INSTRUCTION,
+    build_prompt,
+    json_to_result,
+    parse_json_object,
+)
 
 log = logging.getLogger("autorca.gemini")
 
 _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-
-_SYSTEM_INSTRUCTION = (
-    "You are a senior site-reliability engineer performing root-cause analysis (RCA) "
-    "on application error logs. You correlate related log lines, follow exception "
-    "'Caused by' chains to the deepest root cause, detect cascading failures, and "
-    "classify issues as application defects, infrastructure problems, integration "
-    "failures, or configuration errors. Be precise, technical, and actionable. "
-    "Base every claim on evidence in the provided log; never invent stack frames."
-)
-
-# JSON schema we ask Gemini to fill. Kept flat & explicit for reliable parsing.
-_PROMPT_TEMPLATE = """Analyze the following error-log digest from file "{file_name}".
-
-Return ONLY a JSON object (no markdown, no commentary) with EXACTLY these keys:
-{{
-  "summary": "ONE short, plain sentence: what is the problem? (a non-engineer should get it)",
-  "simple_explanation": "1-2 sentences in very simple, non-technical language explaining the problem and why it happened, as if to a beginner",
-  "level": "the SINGLE level where the issue lives: 'Application' | 'Server' | 'Database' | 'Network'",
-  "level_reason": "one short clause on why it's that level",
-  "error_type": "short label, e.g. 'Authentication / Session Expiry'",
-  "exception_class": "fully-qualified primary exception class",
-  "affected_component": "the service/component/module at fault",
-  "failure_point": "the specific class.method(file:line) where it failed",
-  "probable_trigger": "what action/event set this off",
-  "category": "one of: application | infrastructure | integration | configuration",
-  "what_happened": "2-4 sentence factual description",
-  "why_it_happened": "the mechanism of failure",
-  "root_cause": "the deepest underlying cause",
-  "impact": "user/business/system impact",
-  "resolution_steps": ["ordered, concrete remediation steps"],
-  "sequence_of_events": ["chronological steps reconstructed from the log"],
-  "cascading_failures": ["secondary failures this triggered, if any"],
-  "confidence": "High | Medium | Low",
-  "confidence_reason": "why this confidence level",
-  "reason_groups": [
-    {{
-      "reason": "COPY the exact reason string given in DISTINCT REASONS below",
-      "title": "short plain headline for this specific reason",
-      "level": "Application | Server | Database | Network",
-      "simple_explanation": "1-2 sentences, plain non-technical language",
-      "what_happened": "what failed for this reason",
-      "root_cause": "the underlying cause of THIS reason",
-      "fix": "the single most important fix for this reason"
-    }}
-  ]
-}}
-
-IMPORTANT about reason_groups: the log may contain SEVERAL different failures on
-DIFFERENT endpoints. Produce ONE entry in "reason_groups" for EACH distinct reason
-listed under DISTINCT REASONS below — explain each one separately. If there is only
-one reason, return a single entry. Always copy the "reason" value verbatim so it can
-be matched back to its endpoints.
-
-Guidance for "level":
-- Application = a bug/defect or logic issue in the app's own code (e.g. NullPointerException, bad auth handling, unhandled case).
-- Server     = the host/runtime/process or its configuration (e.g. out-of-memory, disk full, JVM/startup/config failure).
-- Database   = the datastore (e.g. connection refused, SQL error, deadlock, pool exhausted).
-- Network    = connectivity between services (e.g. timeouts, connection refused to a remote host, DNS, integration calls).
-
-Log statistics: total_lines={total_lines}, severities={severities}, correlation_ids={correlation_ids}.
-Exception classes seen (first->last): {exception_classes}
-Caused-by chain (outer->root): {caused_by}
-
-PRIMARY HTTP REQUEST: {request_line}
-REQUEST BODY: {request_body}
-PRIMARY HTTP RESPONSE: {response_line}
-RESPONSE BODY: {response_body}
-
-AFFECTED ENDPOINTS (endpoint | status | count | reason):
-{incidents_block}
-
-DISTINCT REASONS (one reason_groups entry required for each):
-{distinct_reasons}
-
---- LOG DIGEST START ---
-{excerpt}
---- LOG DIGEST END ---
-"""
-
-_LIST_FIELDS = {"resolution_steps", "sequence_of_events", "cascading_failures"}
-_STR_FIELDS = {
-    "summary", "simple_explanation", "level", "level_reason",
-    "error_type", "exception_class", "affected_component",
-    "failure_point", "probable_trigger", "category", "what_happened",
-    "why_it_happened", "root_cause", "impact", "confidence", "confidence_reason",
-}
 
 
 class GeminiProvider(AnalysisProvider):
@@ -129,7 +48,7 @@ class GeminiProvider(AnalysisProvider):
 
         try:
             data = self._call_gemini(digest, file_name)
-            result = self._to_result(data, digest)
+            result = json_to_result(data, digest)
             result.engine = self.name
             result.model = self.model
             return result
@@ -146,35 +65,10 @@ class GeminiProvider(AnalysisProvider):
         raise RuntimeError(f"Gemini unavailable and no fallback configured: {reason}")
 
     def _call_gemini(self, digest: ErrorDigest, file_name: str) -> Dict[str, Any]:
-        # Build the affected-endpoints block + the distinct reasons to explain.
-        incident_lines, distinct = [], []
-        for inc in digest.incidents[:14]:
-            incident_lines.append(
-                f"- {inc.endpoint}  | {inc.status} | x{inc.count} | reason: {inc.reason}"
-            )
-            if inc.reason not in distinct:
-                distinct.append(inc.reason)
-        incidents_block = "\n".join(incident_lines) or "(no error responses captured)"
-        distinct_reasons = "\n".join(f"- {r}" for r in distinct[:8]) or "(none)"
-
-        prompt = _PROMPT_TEMPLATE.format(
-            file_name=file_name,
-            total_lines=digest.total_lines,
-            severities=dict(digest.severities),
-            correlation_ids=digest.correlation_ids[:5],
-            exception_classes=digest.exception_classes[:10] or ["(none)"],
-            caused_by=digest.caused_by_chain[:10] or ["(none)"],
-            request_line=digest.request_line or "(none)",
-            request_body=digest.request_body or "(none)",
-            response_line=digest.response_line or "(none)",
-            response_body=digest.response_body or "(none)",
-            incidents_block=incidents_block,
-            distinct_reasons=distinct_reasons,
-            excerpt=digest.excerpt or "(no excerpt extracted)",
-        )
+        prompt = build_prompt(digest, file_name)
 
         body = {
-            "system_instruction": {"parts": [{"text": _SYSTEM_INSTRUCTION}]},
+            "system_instruction": {"parts": [{"text": SYSTEM_INSTRUCTION}]},
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
             "generationConfig": {
                 "temperature": 0.2,
@@ -202,52 +96,4 @@ class GeminiProvider(AnalysisProvider):
         except (KeyError, IndexError) as exc:
             raise RuntimeError(f"Unexpected Gemini response shape: {payload}") from exc
 
-        return self._parse_json(text)
-
-    @staticmethod
-    def _parse_json(text: str) -> Dict[str, Any]:
-        text = text.strip()
-        # Strip accidental markdown fences if the model added them.
-        if text.startswith("```"):
-            text = text.strip("`")
-            if text.lstrip().startswith("json"):
-                text = text.lstrip()[4:]
-        # Grab the outermost JSON object.
-        start, end = text.find("{"), text.rfind("}")
-        if start != -1 and end != -1:
-            text = text[start:end + 1]
-        return json.loads(text)
-
-    def _to_result(self, data: Dict[str, Any], digest: ErrorDigest) -> AnalysisResult:
-        result = AnalysisResult()
-        for field in _STR_FIELDS:
-            val = data.get(field)
-            if isinstance(val, str):
-                setattr(result, field, val.strip())
-        for field in _LIST_FIELDS:
-            val = data.get(field)
-            if isinstance(val, list):
-                setattr(result, field, [str(x).strip() for x in val if str(x).strip()])
-            elif isinstance(val, str) and val.strip():
-                setattr(result, field, [val.strip()])
-
-        # reason_groups is a list of dicts (one per distinct error reason).
-        rg = data.get("reason_groups")
-        if isinstance(rg, list):
-            result.reason_groups = [g for g in rg if isinstance(g, dict)]
-
-        # Backfill anything the model left blank from the deterministic digest.
-        if not result.exception_class and digest.primary_exception:
-            result.exception_class = digest.primary_exception
-        if not result.affected_component and digest.components:
-            result.affected_component = digest.components[0]
-        if not result.confidence:
-            result.confidence = "Medium"
-        if not result.level:
-            # Map the broad category onto a level as a fallback.
-            result.level = {
-                "infrastructure": "Server", "configuration": "Server",
-                "integration": "Network", "application": "Application",
-            }.get((result.category or "").lower(), "Application")
-        result.level = result.level.strip().title()
-        return result
+        return parse_json_object(text)

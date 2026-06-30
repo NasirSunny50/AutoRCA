@@ -13,6 +13,7 @@ from flask import Flask, abort, jsonify, render_template, request, send_file
 
 from ..config import Config, load_config
 from ..database import Database
+from ..engines import ENGINE_OPTIONS, active_engine, option_by_id
 
 # Human-friendly metadata for category chips (label + accent colour class).
 CATEGORY_META = {
@@ -123,13 +124,21 @@ def create_app(config: Optional[Config] = None) -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["AUTORCA"] = config
 
-    @app.context_processor
-    def _inject_helpers():
-        return {"LEVELS": LEVELS, "level_icon": _level_icon, "cat_meta": _category_meta}
-
     def db() -> Database:
         # One connection per request keeps things simple and process-safe.
         return Database(config.db_path)
+
+    @app.context_processor
+    def _inject_helpers():
+        database = db()
+        try:
+            current = active_engine(config, database)
+        finally:
+            database.close()
+        return {
+            "LEVELS": LEVELS, "level_icon": _level_icon, "cat_meta": _category_meta,
+            "engine_options": ENGINE_OPTIONS, "active_engine": current,
+        }
 
     @app.route("/")
     def dashboard():
@@ -175,6 +184,25 @@ def create_app(config: Optional[Config] = None) -> Flask:
         if not row or not row.get("report_path") or not Path(row["report_path"]).exists():
             abort(404)
         return send_file(row["report_path"], as_attachment=True)
+
+    @app.route("/api/provider", methods=["POST"])
+    def api_set_provider():
+        """Switch the active AI engine (used by the portal's model dropdown).
+
+        Applies to the NEXT file the monitor analyses (the two run as separate
+        processes and share this setting via the database).
+        """
+        engine_id = (request.json or {}).get("engine") if request.is_json else request.form.get("engine")
+        option = option_by_id(engine_id or "")
+        if not option:
+            return jsonify({"ok": False, "error": f"unknown engine '{engine_id}'"}), 400
+        database = db()
+        try:
+            database.set_setting("active_provider", option["provider"])
+            database.set_setting("active_model", option["model"])
+        finally:
+            database.close()
+        return jsonify({"ok": True, "engine": option})
 
     @app.route("/api/stats")
     def api_stats():

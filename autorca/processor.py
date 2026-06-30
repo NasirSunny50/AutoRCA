@@ -17,12 +17,15 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
+from typing import Dict, Tuple
 
 from .config import Config
 from .database import Database, hash_file
+from .engines import active_provider_model
 from .log_parser import parse_log
+from .providers import build_provider
 from .providers.base import AnalysisProvider, AnalysisResult
 from .reporter import render_markdown, write_report
 
@@ -30,10 +33,28 @@ log = logging.getLogger("autorca.processor")
 
 
 class Processor:
-    def __init__(self, config: Config, db: Database, provider: AnalysisProvider):
+    def __init__(self, config: Config, db: Database, provider: AnalysisProvider = None):
         self.config = config
         self.db = db
-        self.provider = provider
+        # Providers are resolved per file from the active engine (settings table),
+        # so a switch made in the portal takes effect on the next analysis.
+        self._provider_cache: Dict[Tuple[str, str], AnalysisProvider] = {}
+
+    def _active_provider(self) -> AnalysisProvider:
+        provider, model = active_provider_model(self.config, self.db)
+        key = (provider, model)
+        cached = self._provider_cache.get(key)
+        if cached is None:
+            if provider == "gemini":
+                cfg = replace(self.config, provider="gemini", model=model)
+            elif provider == "local":
+                cfg = replace(self.config, provider="local", local_model=model)
+            else:
+                cfg = replace(self.config, provider="heuristic")
+            cached = build_provider(cfg)
+            self._provider_cache[key] = cached
+            log.info("Active engine: %s (%s)", provider, model or "rules")
+        return cached
 
     def process(self, path: Path) -> bool:
         """Process one file. Returns True if a (new) analysis was produced."""
@@ -62,7 +83,7 @@ class Processor:
                 log.info("No errors detected in %s; recording as processed.", path.name)
                 result = self._no_error_result()
             else:
-                result = self.provider.analyze(digest, path.name)
+                result = self._active_provider().analyze(digest, path.name)
 
             report = render_markdown(
                 result, digest, source_file=path.name, content_hash=content_hash

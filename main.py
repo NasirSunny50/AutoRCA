@@ -16,8 +16,8 @@ from pathlib import Path
 
 from autorca.config import load_config
 from autorca.database import Database
+from autorca.engines import active_provider_model
 from autorca.processor import Processor
-from autorca.providers import build_provider
 from autorca.service import MonitorService
 
 
@@ -45,12 +45,11 @@ def main(argv=None) -> int:
     log = logging.getLogger("autorca")
 
     db = Database(config.db_path)
-    provider = build_provider(config)
-    processor = Processor(config, db, provider)
+    processor = Processor(config, db)
 
-    log.info("AutoRCA starting | provider=%s model=%s | watch=%s",
-             config.provider, config.model if config.provider == "gemini" else "-",
-             config.watch_dir)
+    active_provider, active_model = active_provider_model(config, db)
+    log.info("AutoRCA starting | engine=%s %s | watch=%s",
+             active_provider, active_model or "(rules)", config.watch_dir)
 
     try:
         if args.stats:

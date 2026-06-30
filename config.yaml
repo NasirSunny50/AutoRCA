@@ -29,9 +29,11 @@ processing:
   max_excerpt_chars: 16000
 
 ai:
-  # Provider: "gemini" | "heuristic"
+  # Provider: "gemini" | "local" | "heuristic"
   #   gemini    -> Google Gemini free tier (needs GEMINI_API_KEY in .env)
-  #   heuristic -> offline rule engine, no API key, no internet
+  #   local     -> a model running locally via Ollama (no API key, no internet,
+  #                no data leaves the machine). See the local_* settings below.
+  #   heuristic -> offline rule engine, no API key, no internet, no model
   provider: "gemini"
   # Gemini model id (free tier). gemini-2.5-flash is current, strong & generous.
   # (Tip: if a model returns HTTP 429 "limit: 0", that model isn't enabled on
@@ -41,6 +43,18 @@ ai:
   timeout_seconds: 60
   # If the AI call fails, fall back to the offline heuristic engine
   fallback_to_heuristic: true
+
+  # ---- Local model (Ollama) — only used when provider: "local" ----
+  # Install Ollama (https://ollama.com/download), then:  ollama pull qwen2.5-coder:7b
+  #   - 16 GB+ RAM machine: "qwen2.5-coder:7b"  (best quality)
+  #   - tighter RAM / faster: "qwen2.5-coder:3b"
+  local_model: "qwen2.5-coder:7b"
+  # Where the Ollama server listens
+  local_host: "http://localhost:11434"
+  # Context window (tokens). Bigger = fits more log, uses more RAM.
+  local_num_ctx: 8192
+  # Local CPU inference can take minutes per report — keep this generous.
+  local_timeout_seconds: 300
 
 logging:
   level: "INFO"            # DEBUG | INFO | WARNING | ERROR

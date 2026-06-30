@@ -42,6 +42,11 @@ class Config:
     timeout_seconds: float
     fallback_to_heuristic: bool
     gemini_api_key: str = ""
+    # local LLM (Ollama) provider
+    local_model: str = "qwen2.5-coder:7b"
+    local_host: str = "http://localhost:11434"
+    local_num_ctx: int = 8192
+    local_timeout_seconds: float = 300.0
     # logging
     log_level: str = "INFO"
     log_file: Path = field(default_factory=lambda: PROJECT_ROOT / "autorca_service.log")
@@ -93,6 +98,10 @@ def load_config(config_path: str | os.PathLike | None = None) -> Config:
         timeout_seconds=float(ai.get("timeout_seconds", 60)),
         fallback_to_heuristic=bool(ai.get("fallback_to_heuristic", True)),
         gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
+        local_model=ai.get("local_model", "qwen2.5-coder:7b"),
+        local_host=ai.get("local_host", "http://localhost:11434"),
+        local_num_ctx=int(ai.get("local_num_ctx", 8192)),
+        local_timeout_seconds=float(ai.get("local_timeout_seconds", 300)),
         log_level=log.get("level", "INFO").upper(),
         log_file=_resolve(log.get("file", "autorca_service.log")),
     )

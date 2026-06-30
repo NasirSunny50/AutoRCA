@@ -56,6 +56,34 @@ html[data-theme="light"] details.evidence pre { background: #f3f6fc; color: var(
 html[data-theme="light"] .theme-toggle .ic-dark { display: none; }
 html[data-theme="light"] .theme-toggle .ic-light { display: inline; }
 
+/* model selection dropdown */
+.engine-pick {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 38px; padding: 0 10px; border-radius: 9px;
+  background: var(--card); border: 1px solid var(--border-2); transition: .15s;
+}
+.engine-pick:hover { background: var(--card-2); }
+.engine-pick .engine-ic { font-size: 15px; line-height: 1; }
+.engine-pick select {
+  background: transparent; border: 0; outline: none; cursor: pointer;
+  color: var(--text); font: inherit; font-size: 14px; font-weight: 600;
+  max-width: 210px;
+}
+.engine-pick select:disabled { opacity: .5; cursor: progress; }
+.engine-pick select option { color: #111; }
+
+/* toast confirming an engine switch */
+.engine-toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px);
+  max-width: 90vw; padding: 11px 18px; border-radius: 10px;
+  background: var(--card-2); color: var(--text);
+  border: 1px solid var(--border-2); box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  font-size: 14px; font-weight: 600; z-index: 60;
+  opacity: 0; visibility: hidden; transition: opacity .2s, transform .2s;
+}
+.engine-toast.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+.engine-toast.err { border-color: #f85149; }
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {

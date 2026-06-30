@@ -127,9 +127,11 @@ python main.py --config PATH   # use an alternate config file
 | `processing.reports_dir` | where reports are written | `reports` |
 | `processing.db_path` | history database | `autorca.db` |
 | `processing.max_excerpt_chars` | max log size sent to AI | `16000` |
-| `ai.provider` | `gemini` or `heuristic` | `gemini` |
+| `ai.provider` | `gemini`, `local`, or `heuristic` | `gemini` |
 | `ai.model` | Gemini model id | `gemini-2.0-flash` |
 | `ai.fallback_to_heuristic` | fall back if AI fails | `true` |
+| `ai.local_model` | Ollama model id (when `provider: local`) | `qwen2.5-coder:7b` |
+| `ai.local_host` | Ollama server URL | `http://localhost:11434` |
 
 Secrets (the API key) live in **`.env`**, never in `config.yaml`.
 
@@ -200,10 +202,44 @@ AutoRCA/
    ├─ reporter.py          # digest+analysis -> Markdown report
    ├─ providers/
    │  ├─ base.py           # provider interface + AnalysisResult
+   │  ├─ _rca_shared.py        # shared RCA prompt + JSON->result (one schema)
    │  ├─ gemini_provider.py    # Google Gemini (free) via REST
+   │  ├─ local_provider.py     # local model via Ollama (offline)
    │  └─ heuristic_provider.py # offline rule engine / fallback
    └─ web/                 # Flask portal (templates + static + routes)
 ```
+
+---
+
+## 🏠 Local model (fully offline AI)
+
+Prefer not to send logs to a cloud API — or have no internet / no key? Run a
+model **entirely on your machine** via [Ollama](https://ollama.com). Same report
+quality structure, nothing leaves the host.
+
+```powershell
+# 1. One-time setup (installs Ollama + downloads the model)
+scripts\"Setup Local Model.bat"           # default: qwen2.5-coder:7b
+scripts\"Setup Local Model.bat" qwen2.5-coder:3b   # lighter / faster
+
+# 2. Switch the provider in config.yaml
+#      ai.provider: "local"
+
+# 3. Run as usual
+scripts\"Start AutoRCA.bat"
+```
+
+**Model picks** (CPU inference; needs RAM headroom):
+
+| RAM | Recommended | Notes |
+|-----|-------------|-------|
+| 16 GB+ | `qwen2.5-coder:7b` | best local quality for this task |
+| 8 GB   | `qwen2.5-coder:3b` | faster, lighter, weaker on complex logs |
+
+> Local CPU analysis is **slower** than Gemini (≈1–4 min/report on an older
+> CPU) and reasoning is weaker than the cloud model — it's best as an
+> **offline / privacy / fallback** option. If the local model is unreachable,
+> AutoRCA falls back to the offline heuristic engine automatically.
 
 ---
 
