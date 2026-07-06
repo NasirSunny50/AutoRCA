@@ -61,6 +61,7 @@ class Processor:
         path = path.resolve()
         if not path.exists():
             return False
+        project = self._project_for(path)
 
         try:
             content_hash = hash_file(path)
@@ -94,6 +95,7 @@ class Processor:
             self.db.record(
                 file_name=path.name,
                 source_path=str(path),
+                project=project,
                 content_hash=content_hash,
                 size_bytes=path.stat().st_size,
                 status="processed",
@@ -121,6 +123,7 @@ class Processor:
                 self.db.record(
                     file_name=path.name,
                     source_path=str(path),
+                    project=project,
                     content_hash=content_hash,
                     size_bytes=path.stat().st_size if path.exists() else 0,
                     status="failed",
@@ -133,10 +136,28 @@ class Processor:
             return False
 
     # ------------------------------------------------------------------ helpers
+    def _project_for(self, path: Path) -> str:
+        """The project a log belongs to = the top-level sub-folder under the
+        watch dir (e.g. 'Nagad'). Files dropped directly in the watch dir, or
+        outside it, have no project."""
+        try:
+            rel = path.resolve().relative_to(self.config.watch_dir.resolve())
+        except ValueError:
+            return None
+        # rel.parts[-1] is the file name; a leading folder (if any) is the project.
+        return rel.parts[0] if len(rel.parts) >= 2 else None
+
+    def _processed_dir_for(self, path: Path) -> Path:
+        """Processed files are moved into a 'processed' folder inside their own
+        project folder, so each project's history stays separate."""
+        project = self._project_for(path)
+        base = self.config.watch_dir / project if project else self.config.watch_dir
+        return base / self.config.processed_subdir
+
     def _move_to_processed(self, path: Path) -> None:
         if not path.exists():
             return
-        dest_dir = self.config.processed_dir
+        dest_dir = self._processed_dir_for(path)
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / path.name
         # Avoid clobbering an existing file of the same name.

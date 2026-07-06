@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS processed_files (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     file_name     TEXT    NOT NULL,
     source_path   TEXT    NOT NULL,
+    project       TEXT,
     content_hash  TEXT    NOT NULL,
     size_bytes    INTEGER NOT NULL,
     status        TEXT    NOT NULL,          -- 'processed' | 'failed'
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
 # Columns added after the initial release; applied to pre-existing databases.
 _MIGRATION_COLUMNS = {
+    "project": "TEXT",
     "summary": "TEXT",
     "error_type": "TEXT",
     "category": "TEXT",
@@ -116,6 +118,7 @@ class Database:
         content_hash: str,
         size_bytes: int,
         status: str,
+        project: Optional[str] = None,
         report_path: Optional[str] = None,
         error_message: Optional[str] = None,
         summary: Optional[str] = None,
@@ -137,15 +140,16 @@ class Database:
             self._conn.execute(
                 """
                 INSERT INTO processed_files
-                    (file_name, source_path, content_hash, size_bytes,
+                    (file_name, source_path, project, content_hash, size_bytes,
                      status, report_path, error_message, processed_at,
                      summary, error_type, category, confidence, engine,
                      level, simple_explanation, endpoint, request_body, response_body,
                      response_status, incidents_json, analysis_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(content_hash) DO UPDATE SET
                     file_name=excluded.file_name,
                     source_path=excluded.source_path,
+                    project=excluded.project,
                     size_bytes=excluded.size_bytes,
                     status=excluded.status,
                     report_path=excluded.report_path,
@@ -168,6 +172,7 @@ class Database:
                 (
                     file_name,
                     source_path,
+                    project,
                     content_hash,
                     size_bytes,
                     status,
@@ -216,18 +221,32 @@ class Database:
         return {r["status"]: r["n"] for r in rows}
 
     # ------------------------------------------------------------------ portal queries
-    def list_reports(self, search: str = "") -> list:
-        """Return all records (newest first), optionally filtered by a search term."""
+    def list_projects(self) -> list:
+        """Distinct project names that have at least one analysis (newest first)."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT project, MAX(datetime(processed_at)) AS last "
+                "FROM processed_files WHERE project IS NOT NULL AND project != '' "
+                "GROUP BY project ORDER BY last DESC"
+            ).fetchall()
+        return [r["project"] for r in rows]
+
+    def list_reports(self, search: str = "", project: Optional[str] = None) -> list:
+        """Return all records (newest first), optionally filtered by search + project."""
         sql = "SELECT * FROM processed_files"
-        params: tuple = ()
+        clauses, params = [], []
+        if project:
+            clauses.append("project = ?")
+            params.append(project)
         if search:
             like = f"%{search}%"
-            sql += (" WHERE file_name LIKE ? OR summary LIKE ? OR error_type LIKE ?"
-                    " OR category LIKE ?")
-            params = (like, like, like, like)
+            clauses.append("(file_name LIKE ? OR summary LIKE ? OR error_type LIKE ? OR category LIKE ?)")
+            params += [like, like, like, like]
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
         sql += " ORDER BY datetime(processed_at) DESC"
         with self._lock:
-            rows = self._conn.execute(sql, params).fetchall()
+            rows = self._conn.execute(sql, tuple(params)).fetchall()
         return [dict(r) for r in rows]
 
     def get_report(self, report_id: int) -> Optional[dict]:
@@ -237,24 +256,29 @@ class Database:
             ).fetchone()
         return dict(row) if row else None
 
-    def dashboard_stats(self) -> dict:
-        """Aggregate counts for the dashboard."""
+    def dashboard_stats(self, project: Optional[str] = None) -> dict:
+        """Aggregate counts for the dashboard, optionally scoped to one project."""
+        # A reusable WHERE fragment + params for the project filter.
+        pf = " AND project = ?" if project else ""
+        pp = (project,) if project else ()
         with self._lock:
-            total = self._conn.execute("SELECT COUNT(*) AS n FROM processed_files").fetchone()["n"]
+            total = self._conn.execute(
+                "SELECT COUNT(*) AS n FROM processed_files WHERE 1=1" + pf, pp).fetchone()["n"]
             by_status = {r["status"]: r["n"] for r in self._conn.execute(
-                "SELECT status, COUNT(*) AS n FROM processed_files GROUP BY status")}
+                "SELECT status, COUNT(*) AS n FROM processed_files WHERE 1=1" + pf +
+                " GROUP BY status", pp)}
             by_level = {(r["level"] or "n/a"): r["n"] for r in self._conn.execute(
                 "SELECT level, COUNT(*) AS n FROM processed_files "
-                "WHERE status='processed' GROUP BY level ORDER BY n DESC")}
+                "WHERE status='processed'" + pf + " GROUP BY level ORDER BY n DESC", pp)}
             by_category = {(r["category"] or "n/a"): r["n"] for r in self._conn.execute(
                 "SELECT category, COUNT(*) AS n FROM processed_files "
-                "WHERE status='processed' GROUP BY category ORDER BY n DESC")}
+                "WHERE status='processed'" + pf + " GROUP BY category ORDER BY n DESC", pp)}
             by_confidence = {(r["confidence"] or "n/a"): r["n"] for r in self._conn.execute(
                 "SELECT confidence, COUNT(*) AS n FROM processed_files "
-                "WHERE status='processed' GROUP BY confidence")}
+                "WHERE status='processed'" + pf + " GROUP BY confidence", pp)}
             by_error_type = {(r["error_type"] or "n/a"): r["n"] for r in self._conn.execute(
                 "SELECT error_type, COUNT(*) AS n FROM processed_files "
-                "WHERE status='processed' GROUP BY error_type ORDER BY n DESC LIMIT 8")}
+                "WHERE status='processed'" + pf + " GROUP BY error_type ORDER BY n DESC LIMIT 8", pp)}
         return {
             "total": total,
             "by_status": by_status,

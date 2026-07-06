@@ -25,12 +25,14 @@ CATEGORY_META = {
     "n/a": ("Uncategorised", "cat-na"),
 }
 
-# The 4 levels shown in the "where is the issue" visual: icon + colour class.
+# The levels shown in the "where is the issue" visual: icon + colour class.
 LEVELS = [
-    ("Application", "📱", "lv-app"),
-    ("Server",      "🖥️", "lv-server"),
-    ("Database",    "🗄️", "lv-db"),
-    ("Network",     "🌐", "lv-net"),
+    ("Application",      "📱", "lv-app"),
+    ("Server",           "🖥️", "lv-server"),
+    ("Database",         "🗄️", "lv-db"),
+    ("Network",          "🌐", "lv-net"),
+    ("External Service", "🔌", "lv-ext"),
+    ("Configuration",    "⚙️", "lv-cfg"),
 ]
 
 
@@ -50,6 +52,25 @@ def _confidence_class(confidence: Optional[str]) -> str:
     return {"high": "conf-high", "medium": "conf-med", "low": "conf-low"}.get(
         (confidence or "").lower(), "conf-na"
     )
+
+
+def _project_folders(config: Config) -> list:
+    """Project names = the immediate sub-folders of the watch dir (minus 'processed')."""
+    base = config.watch_dir
+    if not base.exists():
+        return []
+    return [p.name for p in sorted(base.iterdir())
+            if p.is_dir() and p.name != config.processed_subdir]
+
+
+def _all_projects(config: Config, database: Database) -> list:
+    """Folder-based projects first (so empty ones still show), then any extra
+    projects that exist only in the history DB."""
+    projects = _project_folders(config)
+    for pr in database.list_projects():
+        if pr and pr not in projects:
+            projects.append(pr)
+    return projects
 
 
 def _row_view(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -142,26 +163,32 @@ def create_app(config: Optional[Config] = None) -> Flask:
 
     @app.route("/")
     def dashboard():
+        project = request.args.get("project", "").strip() or None
         database = db()
         try:
-            stats = database.dashboard_stats()
-            recent = [_row_view(r) for r in database.list_reports()[:8]]
+            stats = database.dashboard_stats(project)
+            recent = [_row_view(r) for r in database.list_reports(project=project)[:8]]
+            projects = _all_projects(config, database)
         finally:
             database.close()
         return render_template(
             "dashboard.html", stats=stats, recent=recent,
             cat_meta=_category_meta, active="dashboard",
+            projects=projects, active_project=project,
         )
 
     @app.route("/reports")
     def reports():
         search = request.args.get("q", "").strip()
+        project = request.args.get("project", "").strip() or None
         database = db()
         try:
-            rows = [_row_view(r) for r in database.list_reports(search)]
+            rows = [_row_view(r) for r in database.list_reports(search, project)]
+            projects = _all_projects(config, database)
         finally:
             database.close()
-        return render_template("reports.html", rows=rows, search=search, active="reports")
+        return render_template("reports.html", rows=rows, search=search, active="reports",
+                               projects=projects, active_project=project)
 
     @app.route("/report/<int:report_id>")
     def report_detail(report_id: int):
@@ -214,9 +241,10 @@ def create_app(config: Optional[Config] = None) -> Flask:
 
     @app.route("/api/reports")
     def api_reports():
+        project = request.args.get("project", "").strip() or None
         database = db()
         try:
-            rows = database.list_reports(request.args.get("q", "").strip())
+            rows = database.list_reports(request.args.get("q", "").strip(), project)
         finally:
             database.close()
         # Strip the heavy analysis_json for the list endpoint.

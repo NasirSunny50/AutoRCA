@@ -74,6 +74,23 @@ is moved into **`Error Log File/processed/`**.
 > **No API key?** It still works — it automatically falls back to the built-in
 > offline heuristic engine. Add the key any time to upgrade to full AI analysis.
 
+### 🗂️ Multiple projects
+
+Give each project its own sub-folder inside **`Error Log File/`** and every log
+is tagged with that project automatically:
+
+```
+Error Log File/
+├─ Nagad/         # drop Nagad logs here
+├─ NexusPay/      # drop NexusPay logs here
+└─ MBL Rainbow/   # drop MBL Rainbow logs here
+```
+
+The monitor watches all of them at once. In the portal, a **project switcher**
+(All Projects · Nagad · NexusPay · …) filters the dashboard and report list per
+project. Add a new project any time — just create a new sub-folder; it shows up
+on its own. Each project keeps its own `processed/` history folder.
+
 ---
 
 ## 🖥️ Web Portal

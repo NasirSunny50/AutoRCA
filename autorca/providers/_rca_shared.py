@@ -29,7 +29,7 @@ Return ONLY a JSON object (no markdown, no commentary) with EXACTLY these keys:
 {{
   "summary": "ONE short, plain sentence: what is the problem? (a non-engineer should get it)",
   "simple_explanation": "1-2 sentences in very simple, non-technical language explaining the problem and why it happened, as if to a beginner",
-  "level": "the SINGLE level where the issue lives: 'Application' | 'Server' | 'Database' | 'Network'",
+  "level": "the SINGLE level where the issue lives: 'Application' | 'Server' | 'Database' | 'Network' | 'External Service' | 'Configuration'",
   "level_reason": "one short clause on why it's that level",
   "error_type": "short label, e.g. 'Authentication / Session Expiry'",
   "exception_class": "fully-qualified primary exception class",
@@ -50,7 +50,7 @@ Return ONLY a JSON object (no markdown, no commentary) with EXACTLY these keys:
     {{
       "reason": "COPY the exact reason string given in DISTINCT REASONS below",
       "title": "short plain headline for this specific reason",
-      "level": "Application | Server | Database | Network",
+      "level": "Application | Server | Database | Network | External Service | Configuration",
       "simple_explanation": "1-2 sentences, plain non-technical language",
       "what_happened": "what failed for this reason",
       "root_cause": "the underlying cause of THIS reason",
@@ -65,11 +65,13 @@ listed under DISTINCT REASONS below — explain each one separately. If there is
 one reason, return a single entry. Always copy the "reason" value verbatim so it can
 be matched back to its endpoints.
 
-Guidance for "level":
-- Application = a bug/defect or logic issue in the app's own code (e.g. NullPointerException, bad auth handling, unhandled case).
-- Server     = the host/runtime/process or its configuration (e.g. out-of-memory, disk full, JVM/startup/config failure).
-- Database   = the datastore (e.g. connection refused, SQL error, deadlock, pool exhausted).
-- Network    = connectivity between services (e.g. timeouts, connection refused to a remote host, DNS, integration calls).
+Guidance for "level" (pick the SINGLE best-fitting one):
+- Application      = a bug/defect or logic issue in the app's own code (e.g. NullPointerException, unhandled case, wrong logic).
+- Server           = the host/runtime/process itself (e.g. out-of-memory, disk full, JVM/startup/thread failure).
+- Database         = the datastore (e.g. connection refused, SQL error, deadlock, pool exhausted).
+- Network          = raw connectivity between services (e.g. socket timeouts, connection refused, DNS resolution).
+- External Service = a third-party / upstream dependency that itself failed or returned an error (payment gateway, partner API, SMS/email provider returning 5xx or a bad/contract-breaking response).
+- Configuration    = missing or wrong configuration (absent env var/secret, bad property, unresolved placeholder, misconfigured bean/feature flag).
 
 Log statistics: total_lines={total_lines}, severities={severities}, correlation_ids={correlation_ids}.
 Exception classes seen (first->last): {exception_classes}
@@ -170,8 +172,28 @@ def json_to_result(data: Dict[str, Any], digest: ErrorDigest) -> AnalysisResult:
         result.confidence = "Medium"
     if not result.level:
         result.level = {
-            "infrastructure": "Server", "configuration": "Server",
-            "integration": "Network", "application": "Application",
+            "infrastructure": "Server", "configuration": "Configuration",
+            "integration": "External Service", "application": "Application",
         }.get((result.category or "").lower(), "Application")
-    result.level = result.level.strip().title()
+    result.level = _normalise_level(result.level)
     return result
+
+
+# Canonical level names + common synonyms the model might return.
+_LEVEL_SYNONYMS = {
+    "app": "Application", "application": "Application",
+    "server": "Server", "host": "Server", "runtime": "Server", "infrastructure": "Server",
+    "database": "Database", "db": "Database", "datastore": "Database",
+    "network": "Network", "connectivity": "Network",
+    "external": "External Service", "external service": "External Service",
+    "third party": "External Service", "third-party": "External Service",
+    "3rd party": "External Service", "upstream": "External Service", "integration": "External Service",
+    "security": "Application", "auth": "Application", "authentication": "Application",
+    "authorization": "Application", "authn": "Application", "authz": "Application",
+    "config": "Configuration", "configuration": "Configuration",
+}
+
+
+def _normalise_level(level: str) -> str:
+    key = (level or "").strip().lower()
+    return _LEVEL_SYNONYMS.get(key, (level or "Application").strip().title())

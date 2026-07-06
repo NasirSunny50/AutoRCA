@@ -6,10 +6,20 @@
   <p>Every log AutoRCA has analyzed. Click any row for the full root-cause breakdown.</p>
 </div>
 
+{% if projects %}
+<div class="proj-tabs">
+  <a class="proj-tab {{ 'on' if not active_project }}" href="{{ url_for('reports', q=search) }}">🗂️ All Projects</a>
+  {% for p in projects %}
+    <a class="proj-tab {{ 'on' if active_project == p }}" href="{{ url_for('reports', project=p, q=search) }}">{{ p }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
 <form class="searchbar" method="get" action="{{ url_for('reports') }}">
+  {% if active_project %}<input type="hidden" name="project" value="{{ active_project }}">{% endif %}
   <input type="text" name="q" value="{{ search }}" placeholder="Search by file name, error type, category, or summary…" autofocus>
   <button class="btn" type="submit">Search</button>
-  {% if search %}<a class="btn ghost" style="display:grid;place-items:center" href="{{ url_for('reports') }}">Clear</a>{% endif %}
+  {% if search %}<a class="btn ghost" style="display:grid;place-items:center" href="{{ url_for('reports', project=active_project) }}">Clear</a>{% endif %}
 </form>
 
 <div class="panel">
@@ -24,6 +34,7 @@
             <div class="name">{{ r.file_name }}</div>
             <div class="sum">{{ r.summary or r.error_message or 'No summary' }}</div>
           </div>
+          {% if r.project %}<span class="proj-chip" title="Project">🏷️ {{ r.project }}</span>{% endif %}
           {% if r.level %}<span class="badge conf-na" title="Level">{{ level_icon(r.level) }} {{ r.level }}</span>{% endif %}
           <span class="chip {{ r.category_class }}">{{ r.category_label }}</span>
           <span class="badge {{ r.confidence_class }}">{{ r.confidence or 'n/a' }}</span>

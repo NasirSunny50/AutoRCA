@@ -61,12 +61,13 @@ class MonitorService:
     def _is_candidate(self, path: Path) -> bool:
         if path.suffix.lower() not in self.config.extensions:
             return False
-        # Never (re)process files already inside the processed/ folder.
+        # Never (re)process files inside ANY 'processed' folder (each project
+        # has its own), so also skip if the path passes through one.
         try:
-            path.resolve().relative_to(self.config.processed_dir.resolve())
-            return False
+            rel = path.resolve().relative_to(self.config.watch_dir.resolve())
         except ValueError:
-            return True
+            return False
+        return self.config.processed_subdir not in rel.parts
 
     def enqueue(self, path: Path) -> None:
         if self._is_candidate(path):

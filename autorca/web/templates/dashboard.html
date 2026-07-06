@@ -8,6 +8,7 @@
       <div class="name">{{ r.file_name }}</div>
       <div class="sum">{{ r.summary or r.error_message or 'No summary' }}</div>
     </div>
+    {% if r.project %}<span class="proj-chip" title="Project">🏷️ {{ r.project }}</span>{% endif %}
     {% if r.level %}<span class="badge conf-na" title="Level">{{ level_icon(r.level) }} {{ r.level }}</span>{% endif %}
     <span class="chip {{ r.category_class }}">{{ r.category_label }}</span>
     <span class="badge {{ r.confidence_class }}">{{ r.confidence or 'n/a' }}</span>
@@ -16,36 +17,61 @@
 {% endmacro %}
 
 {% block content %}
-<div class="hero">
+{% set ok = stats.by_status.get('processed', 0) %}
+{% set failed = stats.by_status.get('failed', 0) %}
+{% set success_rate = (ok / stats.total * 100)|round(0,'floor') if stats.total else 0 %}
+<div class="hero reveal">
   <h1>Dashboard <span class="live"><span class="dot"></span> live</span></h1>
-  <p>Automated root-cause analysis of incoming error logs.</p>
+  <p>Real-time automated root-cause analysis of incoming error logs.</p>
+</div>
+
+{% if projects %}
+<div class="proj-tabs reveal d1">
+  <a class="proj-tab {{ 'on' if not active_project }}" href="{{ url_for('dashboard') }}">🗂️ All Projects</a>
+  {% for p in projects %}
+    <a class="proj-tab {{ 'on' if active_project == p }}" href="{{ url_for('dashboard', project=p) }}">{{ p }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="statusbar reveal d1">
+  <span class="si"><span class="k">Project</span> <b>{{ active_project or 'All' }}</b></span>
+  <span class="sep"></span>
+  <span class="si"><span class="k">Engine</span> <b>{{ active_engine.label }}</b></span>
+  <span class="sep"></span>
+  <span class="si"><span class="k">Success</span> <b>{{ success_rate }}%</b></span>
+  <span class="sep"></span>
+  <span class="si"><span class="k">Categories</span> <b>{{ stats.by_category|length }}</b></span>
+  <span class="sep"></span>
+  <span class="si"><span class="k">Status</span> <b style="color:var(--green)">● OPERATIONAL</b></span>
+  <span class="si" style="margin-left:auto"><span class="k">Updated</span> <b id="clock">—</b></span>
 </div>
 
 <div class="grid stats">
-  <div class="stat">
+  <div class="stat reveal d1">
     <div class="label">Total Analyzed</div>
-    <div class="value">{{ stats.total }}</div>
+    <div class="value" data-count="{{ stats.total }}">0</div>
     <div class="sub">log files processed</div>
   </div>
-  <div class="stat">
+  <div class="stat reveal d2">
     <div class="label">Successful</div>
-    <div class="value green">{{ stats.by_status.get('processed', 0) }}</div>
+    <div class="value green" data-count="{{ ok }}">0</div>
     <div class="sub">reports generated</div>
   </div>
-  <div class="stat">
+  <div class="stat reveal d3">
     <div class="label">Failed</div>
-    <div class="value {{ 'red' if stats.by_status.get('failed', 0) else '' }}">{{ stats.by_status.get('failed', 0) }}</div>
+    <div class="value {{ 'red' if failed else '' }}" data-count="{{ failed }}">0</div>
     <div class="sub">could not analyze</div>
   </div>
-  <div class="stat">
+  <div class="stat reveal d4">
     <div class="label">High Confidence</div>
-    <div class="value cyan">{{ stats.by_confidence.get('High', 0) }}</div>
+    <div class="value cyan" data-count="{{ stats.by_confidence.get('High', 0) }}">0</div>
     <div class="sub">strongly evidenced</div>
   </div>
 </div>
 
 <div class="cols">
-  <div class="panel">
+  <div class="panel reveal d3">
     <h2>🕑 Recent Analyses <span class="count">{{ recent|length }} shown</span></h2>
     <div class="body">
       {% if recent %}
@@ -55,14 +81,15 @@
       {% else %}
         <div class="empty">
           <div class="big">📭</div>
-          <p>No analyses yet. Drop a log into <code>Error Log File/</code> and start the monitor with <code>python main.py</code>.</p>
+          <p>No analyses{{ ' for %s' % active_project if active_project }} yet. Drop a log into a project folder
+             (e.g. <code>Error Log File/Nagad/</code>) and start the monitor with <code>python main.py</code>.</p>
         </div>
       {% endif %}
     </div>
   </div>
 
   <div style="display:flex; flex-direction:column; gap:18px;">
-    <div class="panel">
+    <div class="panel reveal d4">
       <h2>🧭 By Level</h2>
       <div class="body">
         {% set total_lvl = stats.by_level.values()|sum %}
@@ -71,35 +98,45 @@
             {% set n = stats.by_level.get(name, 0) %}
             <div class="bar-row">
               <div class="top"><span>{{ icon }} {{ name }}</span><span class="n">{{ n }}</span></div>
-              <div class="bar"><span style="width: {{ (n / total_lvl * 100)|round(0,'floor') if total_lvl else 0 }}%"></span></div>
+              <div class="bar"><span style="--w: {{ (n / total_lvl * 100)|round(0,'floor') if total_lvl else 0 }}%"></span></div>
             </div>
           {% endfor %}
         {% else %}<div class="empty" style="padding:24px"><p>No data yet.</p></div>{% endif %}
       </div>
     </div>
 
-    <div class="panel">
-      <h2>🎯 Confidence</h2>
-      <div class="body">
-        {% set total_conf = stats.by_confidence.values()|sum %}
-        {% if total_conf %}
-          {% for lvl, cls in [('High','green'), ('Medium','amber'), ('Low','red')] %}
-            {% set n = stats.by_confidence.get(lvl, 0) %}
-            <div class="bar-row">
-              <div class="top"><span>{{ lvl }}</span><span class="n">{{ n }}</span></div>
-              <div class="bar {{ cls }}"><span style="width: {{ (n / total_conf * 100)|round(0,'floor') if total_conf else 0 }}%"></span></div>
-            </div>
-          {% endfor %}
-        {% else %}<div class="empty" style="padding:24px"><p>No data yet.</p></div>{% endif %}
-      </div>
-    </div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Auto-refresh the dashboard so new analyses appear without a manual reload.
-  setTimeout(() => location.reload(), 12000);
+  // Count-up animation on the metric readouts.
+  (function(){
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.querySelectorAll('.value[data-count]').forEach(function(el){
+      var target = parseInt(el.getAttribute('data-count'), 10) || 0;
+      if (reduce || target === 0) { el.textContent = target; return; }
+      var start = performance.now(), dur = 900;
+      function tick(now){
+        var p = Math.min((now - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(target * eased);
+        if (p < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  })();
+
+  // Live clock in the status strip.
+  (function(){
+    var c = document.getElementById('clock');
+    if (!c) return;
+    function upd(){ c.textContent = new Date().toLocaleTimeString(); }
+    upd(); setInterval(upd, 1000);
+  })();
+
+  // Gently auto-refresh so new analyses appear on their own.
+  setTimeout(function(){ location.reload(); }, 20000);
 </script>
 {% endblock %}

@@ -156,7 +156,7 @@ _SIGNATURES: List[_Signature] = [
                 r"FileNotFoundException|ClassNotFoundException|NoClassDefFoundError|"
                 r"property.*not found|misconfigur)",
         category="configuration",
-        level="Server",
+        level="Configuration",
         error_type="Configuration / Wiring Error",
         simple="Something the app needs to start or run was missing or set up wrong "
                "(a setting, file, or component). It's a setup/configuration problem.",

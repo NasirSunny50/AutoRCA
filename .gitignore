@@ -7,9 +7,12 @@ autorca_service.log
 *.log
 
 # ---- Input logs (may contain sensitive/production data) ----
-# Keep the folder, ignore everything dropped into it.
-Error Log File/*
+# Ignore everything dropped in, but keep the folder structure (incl. the
+# per-project sub-folders) via their .gitkeep placeholders.
+Error Log File/**
 !Error Log File/.gitkeep
+!Error Log File/*/
+!Error Log File/*/.gitkeep
 
 # ---- Generated & sample reports (may embed log data) ----
 # Keep the folder, ignore the report files.

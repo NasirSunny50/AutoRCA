@@ -8,6 +8,7 @@
 <!-- ============ AT-A-GLANCE VERDICT ============ -->
 <div class="verdict">
   <div class="verdict-top">
+    {% if r.project %}<span class="proj-chip" title="Project">🏷️ {{ r.project }}</span>{% endif %}
     <span class="badge {{ r.confidence_class }}">Confidence: {{ r.confidence or 'n/a' }}</span>
     <span class="chip {{ r.category_class }}">{{ r.category_label }}</span>
     <span class="when">{{ r.file_name }} · {{ r.processed_short }}</span>
@@ -22,7 +23,7 @@
   <!-- LEVEL VISUALIZER -->
   <div class="lvl-wrap">
     <div class="lvl-title">Where is the issue?</div>
-    <div class="lvl-track">
+    <div class="lvl-grid">
       {% for name, icon, cls in LEVELS %}
         {% set on = (name.lower() == lvl.lower()) %}
         <div class="lvl-box {{ cls }} {{ 'on' if on else 'off' }}">
@@ -30,7 +31,6 @@
           <div class="lvl-name">{{ name }}</div>
           {% if on %}<div class="lvl-flag">● affected</div>{% endif %}
         </div>
-        {% if not loop.last %}<div class="lvl-arrow">→</div>{% endif %}
       {% endfor %}
     </div>
     {% if a.level_reason %}<div class="lvl-why">{{ a.level_reason }}</div>{% endif %}
