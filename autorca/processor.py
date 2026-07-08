@@ -113,6 +113,9 @@ class Processor:
                 response_status=digest.response_status,
                 incidents_json=json.dumps([asdict(i) for i in digest.incidents], ensure_ascii=False),
                 analysis_json=json.dumps(asdict(result), ensure_ascii=False),
+                component=digest.failing_component or None,
+                components_involved=",".join(digest.components_involved) or None,
+                transaction_id=(digest.transaction_ids[0] if digest.transaction_ids else None),
             )
             self._move_to_processed(path)
             return True

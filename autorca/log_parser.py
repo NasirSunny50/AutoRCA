@@ -26,6 +26,13 @@ _STACK_FRAME_RE = re.compile(r"^\s*at\s+[\w$.<>]+\(")
 _SEVERITY_RE = re.compile(r"\b(FATAL|ERROR|WARN|SEVERE|CRITICAL|Exception)\b")
 # Correlation / trace id patterns (CID=..., traceId=..., request-id ...)
 _CORRELATION_RE = re.compile(r"\b(?:CID|correlationId|traceId|requestId|request-id)[=:]\s*([\w-]+)", re.I)
+# Bracketed ids used by the multi-component logs:  CID[...] / TID[...] / MID[...]
+_CID_BRACKET_RE = re.compile(r"\bCID\[([\w-]+)\]")
+_TID_BRACKET_RE = re.compile(r"\bTID\[([\w-]+)\]")
+# The leading component tag every line carries, e.g. "[apigw] ..." / "[spg] ..."
+_COMPONENT_RE = re.compile(r"^\[([a-z0-9][a-z0-9_-]*)\]")
+# Header line listing every component that took part in this correlation id.
+_COMPONENTS_HEADER_RE = re.compile(r"^#\s*Components involved:\s*(.+)$", re.I)
 # HTTP request/response markers, e.g. [REQ] POST /path  or  [RES] POST /path 401
 _HTTP_RE = re.compile(r"\[(REQ|RES)\]\s+(\w+)\s+(\S+)(?:\s+(\d{3}))?")
 # Full req/res line with an optional JSON/text body after the path/status.
@@ -150,6 +157,10 @@ class ErrorDigest:
     severities: Counter = field(default_factory=Counter)
     components: List[str] = field(default_factory=list)
     correlation_ids: List[str] = field(default_factory=list)
+    transaction_ids: List[str] = field(default_factory=list)
+    # multi-component logs: every component seen, and the one that raised the error
+    components_involved: List[str] = field(default_factory=list)
+    failing_component: str = ""
     http_events: List[str] = field(default_factory=list)
     error_lines: List[str] = field(default_factory=list)
     # HTTP request/response context
@@ -213,9 +224,31 @@ def parse_log(text: str, max_excerpt_chars: int = 16000) -> ErrorDigest:
     seen_exceptions: List[str] = []
     frames: List[str] = []
     context_window: List[str] = []  # rolling buffer for context before an error
+    comp_order: List[str] = []           # components seen (in first-seen order)
+    header_components: List[str] = []    # authoritative list from the file header
+    error_components: List[str] = []     # components that logged an ERROR/FATAL
+    exception_components: List[str] = [] # components on an exception line
+    error_res_component = ""             # component that returned a 4xx/5xx
 
     for raw in lines:
         line = raw.rstrip("\n")
+
+        # leading component tag, e.g. "[spg] ..." ; and the header component list
+        cmatch = _COMPONENT_RE.match(line)
+        comp = cmatch.group(1) if cmatch else None
+        if comp and comp not in comp_order:
+            comp_order.append(comp)
+        hdr = _COMPONENTS_HEADER_RE.match(line)
+        if hdr:
+            header_components = [c.strip() for c in hdr.group(1).split(",") if c.strip()]
+
+        # bracketed correlation / transaction ids (CID[...] / TID[...])
+        for cid in _CID_BRACKET_RE.findall(line):
+            if cid and cid not in digest.correlation_ids:
+                digest.correlation_ids.append(cid)
+        for tid in _TID_BRACKET_RE.findall(line):
+            if tid and tid not in digest.transaction_ids:
+                digest.transaction_ids.append(tid)
 
         # collect exception class names
         for m in _EXCEPTION_RE.finditer(line):
@@ -233,8 +266,17 @@ def parse_log(text: str, max_excerpt_chars: int = 16000) -> ErrorDigest:
             frames.append(line)
 
         # severities
-        for sev in _SEVERITY_RE.findall(line):
+        sevs = _SEVERITY_RE.findall(line)
+        for sev in sevs:
             digest.severities[sev.upper() if sev != "Exception" else "EXCEPTION"] += 1
+
+        # which component is at fault: first one to log ERROR/FATAL or an exception
+        if comp:
+            if "ERROR" in sevs or "FATAL" in sevs:
+                if comp not in error_components:
+                    error_components.append(comp)
+            if _EXCEPTION_RE.search(line) and comp not in exception_components:
+                exception_components.append(comp)
 
         # correlation ids
         for cid in _CORRELATION_RE.findall(line):
@@ -260,6 +302,8 @@ def parse_log(text: str, max_excerpt_chars: int = 16000) -> ErrorDigest:
                 )
                 digest.response_status = status or ""
                 digest.response_body = _compact_body(body)
+                if status and status[:1] in ("4", "5") and comp:
+                    error_res_component = comp
 
         # capture error-relevant lines + a little preceding context
         is_error_line = bool(_SEVERITY_RE.search(line)) or bool(cb) \
@@ -276,6 +320,14 @@ def parse_log(text: str, max_excerpt_chars: int = 16000) -> ErrorDigest:
                 context_window.pop(0)
 
     digest.exception_classes = seen_exceptions
+    # Component chain + the component that actually failed (drives Jira component).
+    digest.components_involved = header_components or comp_order
+    digest.failing_component = (
+        (error_components[0] if error_components else "")
+        or (exception_components[0] if exception_components else "")
+        or error_res_component
+        or (digest.components_involved[-1] if digest.components_involved else "")
+    )
     # The deepest "Caused by" exception class is the most probable root cause.
     if digest.caused_by_chain:
         last_cause = digest.caused_by_chain[-1]

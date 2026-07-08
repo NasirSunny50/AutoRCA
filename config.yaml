@@ -56,6 +56,29 @@ ai:
   # Local CPU inference can take minutes per report — keep this generous.
   local_timeout_seconds: 300
 
+# ============================================================================
+# Jira integration — the "Create Jira Issue" button on a report
+# ----------------------------------------------------------------------------
+# Jira Server / Data Center. Secrets live in .env:
+#   JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD
+# ============================================================================
+jira:
+  # Map each AutoRCA project (watch-dir sub-folder) to its Jira project KEY.
+  project_map:
+    Nagad: "DFS"           # KSL_R&D-DigitalFinancialServices-Nagad
+    MBL Rainbow: "RAINBOW" # KSL_R&D-KonaPay_MBL Rainbow
+    NexusPay: "KONAPAY"    # KSL_R&D-KonaPay-DBBL-Bangladesh
+  # Assignees — name / username / email (resolved via Jira user search).
+  #   Application-level issues -> assignee_application
+  #   Server/DB/Network/External/Configuration ("service") -> assignee_service
+  assignee_application: "Sumit Saha Sourav"   # Application issues
+  assignee_service: "Md. Iqbal Hossain"       # service issues
+  # Issue type names exactly as they appear in your Jira projects.
+  bug_type: "Bug"
+  improvement_type: "Improvement"
+  # Set to false only if the Jira server uses a self-signed TLS certificate.
+  verify_ssl: true
+
 logging:
   level: "INFO"            # DEBUG | INFO | WARNING | ERROR
   file: "autorca_service.log"

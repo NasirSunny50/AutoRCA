@@ -288,6 +288,56 @@ code, pre, .mono { font-family: var(--mono); }
 .rrow:hover { background: var(--card-2); border-color: var(--border-2); transform: translateX(2px); }
 .rrow:hover::before { width:3px; }
 
+/* ---------- report actions bar + Jira button ---------- */
+.report-actions { display:flex; align-items:center; gap:12px; margin: 4px 0 14px; }
+.report-actions .back { margin:0; }
+.report-actions .ra-right { margin-left:auto; display:flex; gap:10px; align-items:center; }
+/* keep every control in the actions row the same height */
+.report-actions .btn {
+  height:38px; display:inline-flex; align-items:center; justify-content:center;
+  padding:0 16px; font-size:13.5px; border-radius:9px;
+}
+.jira-btn {
+  display:inline-flex; align-items:center; gap:7px;
+  background: linear-gradient(135deg,#2684ff,#0052cc); border:0; color:#fff;
+  font-weight:700; cursor:pointer; box-shadow: 0 4px 16px rgba(38,132,255,.35);
+}
+.jira-btn:hover { filter: brightness(1.08); }
+.jira-btn:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; filter:grayscale(.3); }
+.jira-btn .jira-ic { font-size:15px; line-height:1; }
+.jira-comp {
+  height:38px; padding:0 10px; border-radius:9px; font:inherit; font-size:13.5px; font-weight:600;
+  background: var(--card); color: var(--text); border:1px solid var(--border-2); cursor:pointer; max-width:180px;
+}
+.jira-comp option { color:#111; }
+.jira-auto {
+  display:inline-flex; align-items:center; height:38px; padding:0 12px; border-radius:9px;
+  font-weight:700; font-size:13px; color:var(--accent); white-space:nowrap;
+  background: rgba(56,224,255,.09); border:1px solid rgba(56,224,255,.28);
+}
+
+/* component flow strip on the report detail */
+.comp-strip {
+  display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; margin-top:16px;
+  padding:11px 14px; border-radius:12px; background:var(--bg-soft); border:1px solid var(--border);
+}
+.comp-strip .cs-label { font-family:var(--mono); font-size:11px; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--muted); font-weight:700; }
+.cs-flow { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+.comp-node {
+  font-family:var(--mono); font-size:12px; font-weight:700; padding:3px 9px; border-radius:7px;
+  background:var(--card-2); border:1px solid var(--border-2); color:var(--text-soft);
+}
+.comp-node.fail { color:#fff; background:linear-gradient(135deg,#ff5c7a,#c93b56);
+  border-color:transparent; box-shadow:0 3px 12px rgba(255,92,122,.35); }
+.cs-arrow { color:var(--muted-2); font-size:14px; }
+.cs-tid { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--muted); }
+.jira-btn.done {
+  background: rgba(52,226,155,.14); color: var(--green);
+  border:1px solid rgba(52,226,155,.4); box-shadow:none;
+}
+html[data-theme="light"] .jira-btn.done { color:#0a7f57; }
+
 /* ---------- project tabs + chip ---------- */
 .proj-tabs { display:flex; flex-wrap:wrap; gap:8px; margin: 0 0 16px; }
 .proj-tab {

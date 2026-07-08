@@ -3,7 +3,24 @@
 {% set a = r.analysis %}
 {% set lvl = (a.level or r.level or '') %}
 {% block content %}
-<a class="back" href="{{ url_for('reports') }}">← Back to all reports</a>
+<div class="report-actions">
+  <a class="back" href="{{ url_for('reports') }}">← Back to all reports</a>
+  <div class="ra-right">
+    {% if r.jira_key %}
+      <a class="btn jira-btn done" href="{{ r.jira_url or '#' }}" target="_blank" rel="noopener"
+         title="Jira issue already created">✓ {{ r.jira_key }} ↗</a>
+    {% else %}
+      <span id="jiraAuto" class="jira-auto" style="display:none"></span>
+      <select id="jiraComponent" class="jira-comp" title="Jira component" style="display:none"></select>
+      <button id="jiraBtn" class="btn jira-btn" type="button"
+              data-url="{{ url_for('create_jira', report_id=r.id) }}"
+              data-meta="{{ url_for('jira_meta', report_id=r.id) }}"
+              {% if not jira_project %}disabled title="No Jira project mapped for this report's project"{% endif %}>
+        <span class="jira-ic">🅙</span> Create Jira Issue
+      </button>
+    {% endif %}
+  </div>
+</div>
 
 <!-- ============ AT-A-GLANCE VERDICT ============ -->
 <div class="verdict">
@@ -35,6 +52,19 @@
     </div>
     {% if a.level_reason %}<div class="lvl-why">{{ a.level_reason }}</div>{% endif %}
   </div>
+
+  {% if r.components_involved %}
+  <div class="comp-strip">
+    <span class="cs-label">🧩 Component flow</span>
+    <div class="cs-flow">
+      {% for c in r.components_involved.split(',') %}
+        <span class="comp-node {{ 'fail' if c == r.component }}">{{ c }}{% if c == r.component %} ⚠{% endif %}</span>
+        {%- if not loop.last %}<span class="cs-arrow">›</span>{% endif %}
+      {% endfor %}
+    </div>
+    {% if r.transaction_id %}<span class="cs-tid" title="Transaction / Correlation ID">TID {{ r.transaction_id }}</span>{% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <!-- ============ AFFECTED ENDPOINTS (grouped by reason) ============ -->
@@ -153,7 +183,78 @@
 
   <div style="padding:6px 4px;color:var(--muted-2);font-size:12.5px;">
     Engine: <b>{{ r.engine or 'n/a' }}</b>
-    {% if r.report_path %} · <a style="color:var(--accent)" href="{{ url_for('download', report_id=r.id) }}">⬇ Download full Markdown report</a>{% endif %}
   </div>
 </details>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function(){
+    var btn = document.getElementById('jiraBtn');
+    var comp = document.getElementById('jiraComponent');
+    var auto = document.getElementById('jiraAuto');
+    var toast = document.getElementById('engineToast');
+    if(!btn) return;
+    var toastTimer, autoComp = null;
+    function showToast(msg, ok){
+      if(!toast) return;
+      toast.textContent = msg;
+      toast.className = 'engine-toast show' + (ok === false ? ' err' : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function(){ toast.className = 'engine-toast'; }, 5000);
+    }
+
+    // Load Jira meta: auto type/assignee + auto-selected component (no user input).
+    if(!btn.disabled){
+      fetch(btn.getAttribute('data-meta'))
+        .then(function(r){ return r.json(); })
+        .then(function(m){
+          if(m.issue_type){ btn.title = m.issue_type + (m.assignee ? ' → ' + m.assignee : ''); }
+          if(m.auto_component){
+            autoComp = m.auto_component;
+            if(auto){ auto.textContent = '🧩 ' + m.auto_component; auto.title = 'Auto-selected component'; auto.style.display = ''; }
+          } else if(m.components && m.components.length && comp){
+            // fallback: no auto match -> let the user pick
+            comp.innerHTML = '<option value="">Component…</option>' +
+              m.components.map(function(c){ return '<option>' + c + '</option>'; }).join('');
+            comp.style.display = '';
+          }
+        }).catch(function(){});
+    }
+
+    btn.addEventListener('click', function(){
+      var chosen = autoComp || (comp ? comp.value : '');
+      if(comp && comp.style.display !== 'none' && comp.options.length > 1 && !chosen){
+        showToast('Pick a Jira component first', false);
+        comp.focus(); return;
+      }
+      var label = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="jira-ic">⏳</span> Creating…';
+      fetch(btn.getAttribute('data-url'), {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({component: chosen})
+      })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(d.ok && d.key){
+            var link = document.createElement('a');
+            link.className = 'btn jira-btn done';
+            link.href = d.url || '#'; link.target = '_blank'; link.rel = 'noopener';
+            link.textContent = '✓ ' + d.key + ' ↗';
+            if(comp) comp.remove();
+            if(auto) auto.remove();
+            btn.replaceWith(link);
+            showToast('Jira issue ' + d.key + ' created' + (d.log_attached ? ' with log attached' : ''), true);
+          } else if(d.ok && d.already){
+            showToast('Issue already exists: ' + d.key, true);
+          } else {
+            btn.disabled = false; btn.innerHTML = label;
+            showToast('Could not create issue: ' + (d.error || 'unknown error'), false);
+          }
+        })
+        .catch(function(){ btn.disabled = false; btn.innerHTML = label; showToast('Network error creating issue', false); });
+    });
+  })();
+</script>
 {% endblock %}

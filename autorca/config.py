@@ -47,9 +47,23 @@ class Config:
     local_host: str = "http://localhost:11434"
     local_num_ctx: int = 8192
     local_timeout_seconds: float = 300.0
+    # jira integration (Jira Server/DC: basic auth username+password, API v2)
+    jira_base_url: str = ""
+    jira_user: str = ""
+    jira_password: str = ""
+    jira_verify_ssl: bool = True
+    jira_project_map: dict = field(default_factory=dict)
+    jira_assignee_application: str = ""   # Application-level issues
+    jira_assignee_service: str = ""       # everything else (service issues)
+    jira_bug_type: str = "Bug"
+    jira_improvement_type: str = "Improvement"
     # logging
     log_level: str = "INFO"
     log_file: Path = field(default_factory=lambda: PROJECT_ROOT / "autorca_service.log")
+
+    @property
+    def jira_configured(self) -> bool:
+        return bool(self.jira_base_url and self.jira_user and self.jira_password)
 
     @property
     def processed_dir(self) -> Path:
@@ -78,6 +92,7 @@ def load_config(config_path: str | os.PathLike | None = None) -> Config:
     mon = raw.get("monitoring", {})
     proc = raw.get("processing", {})
     ai = raw.get("ai", {})
+    jira = raw.get("jira", {})
     log = raw.get("logging", {})
 
     extensions = [e.lower() if e.startswith(".") else f".{e.lower()}"
@@ -102,6 +117,15 @@ def load_config(config_path: str | os.PathLike | None = None) -> Config:
         local_host=ai.get("local_host", "http://localhost:11434"),
         local_num_ctx=int(ai.get("local_num_ctx", 8192)),
         local_timeout_seconds=float(ai.get("local_timeout_seconds", 300)),
+        jira_base_url=(os.getenv("JIRA_BASE_URL", jira.get("base_url", "")) or "").strip().rstrip("/"),
+        jira_user=(os.getenv("JIRA_USERNAME") or os.getenv("JIRA_EMAIL") or "").strip(),
+        jira_password=(os.getenv("JIRA_PASSWORD") or os.getenv("JIRA_API_TOKEN") or "").strip(),
+        jira_verify_ssl=str(jira.get("verify_ssl", True)).lower() not in ("false", "0", "no"),
+        jira_project_map={str(k): str(v) for k, v in (jira.get("project_map") or {}).items()},
+        jira_assignee_application=(jira.get("assignee_application", "") or "").strip(),
+        jira_assignee_service=(jira.get("assignee_service", "") or "").strip(),
+        jira_bug_type=jira.get("bug_type", "Bug"),
+        jira_improvement_type=jira.get("improvement_type", "Improvement"),
         log_level=log.get("level", "INFO").upper(),
         log_file=_resolve(log.get("file", "autorca_service.log")),
     )

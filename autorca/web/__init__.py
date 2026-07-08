@@ -14,6 +14,11 @@ from flask import Flask, abort, jsonify, render_template, request, send_file
 from ..config import Config, load_config
 from ..database import Database
 from ..engines import ENGINE_OPTIONS, active_engine, option_by_id
+from ..jira_client import (
+    JiraClient, JiraError, raise_issue_for_report, match_component,
+    decide_assignee as jira_decide_assignee,
+    decide_issue_type as jira_decide_type,
+)
 
 # Human-friendly metadata for category chips (label + accent colour class).
 CATEGORY_META = {
@@ -199,7 +204,67 @@ def create_app(config: Optional[Config] = None) -> Flask:
             database.close()
         if not row:
             abort(404)
-        return render_template("report.html", r=_row_view(row), active="reports")
+        view = _row_view(row)
+        jira_project = config.jira_project_map.get(view.get("project") or "")
+        return render_template(
+            "report.html", r=view, active="reports",
+            jira_enabled=config.jira_configured, jira_project=jira_project,
+        )
+
+    @app.route("/api/report/<int:report_id>/jira/meta")
+    def jira_meta(report_id: int):
+        """What the Create-Issue form needs: mapped project, auto type/assignee,
+        and the project's components (for the dropdown)."""
+        database = db()
+        try:
+            raw = database.get_report(report_id)
+        finally:
+            database.close()
+        if not raw:
+            return jsonify({"ok": False, "error": "report not found"}), 404
+        row = _row_view(raw)
+        project_key = config.jira_project_map.get(row.get("project") or "")
+        info = {
+            "ok": True,
+            "configured": config.jira_configured,
+            "project_key": project_key,
+            "issue_type": jira_decide_type(row, config),
+            "assignee": jira_decide_assignee(row, config),
+            "failing_component": row.get("component"),
+            "auto_component": None,
+            "components": [],
+        }
+        if project_key and config.jira_configured:
+            comps = JiraClient(config).get_components(project_key)
+            info["components"] = comps
+            info["auto_component"] = match_component(row.get("component"), comps)
+        return jsonify(info)
+
+    @app.route("/api/report/<int:report_id>/jira", methods=["POST"])
+    def create_jira(report_id: int):
+        """Create a Jira issue for a report (or dry-run to preview the payload)."""
+        dry = request.args.get("dry") in ("1", "true", "yes")
+        body = request.get_json(silent=True) or {}
+        components = body.get("components") or ([body["component"]] if body.get("component") else [])
+        database = db()
+        try:
+            raw = database.get_report(report_id)
+            if not raw:
+                return jsonify({"ok": False, "error": "report not found"}), 404
+            # Don't create a second issue for the same report.
+            if raw.get("jira_key") and not dry:
+                return jsonify({"ok": True, "already": True,
+                                "key": raw["jira_key"], "url": raw.get("jira_url")})
+            row = _row_view(raw)
+            try:
+                result = raise_issue_for_report(config, row, dry_run=dry, components=components)
+            except JiraError as exc:
+                return jsonify({"ok": False, "error": str(exc)}), 400
+            if not dry and result.get("key"):
+                database.set_jira(report_id, result["key"], result.get("url", ""))
+            return jsonify({"ok": True, **result})
+        finally:
+            database.close()
 
     @app.route("/download/<int:report_id>")
     def download(report_id: int):

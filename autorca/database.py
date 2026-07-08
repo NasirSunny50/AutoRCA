@@ -41,7 +41,12 @@ CREATE TABLE IF NOT EXISTS processed_files (
     response_body TEXT,
     response_status TEXT,
     incidents_json TEXT,                      -- all affected endpoints (multi-incident logs)
-    analysis_json TEXT                        -- full AnalysisResult as JSON (for the web portal)
+    analysis_json TEXT,                       -- full AnalysisResult as JSON (for the web portal)
+    jira_key      TEXT,                       -- e.g. DFS-123 once a Jira issue is raised
+    jira_url      TEXT,
+    component     TEXT,                        -- failing component (e.g. 'spg')
+    components_involved TEXT,                  -- comma-joined component chain
+    transaction_id TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_content_hash ON processed_files(content_hash);
 CREATE INDEX IF NOT EXISTS idx_status ON processed_files(status);
@@ -70,6 +75,11 @@ _MIGRATION_COLUMNS = {
     "response_status": "TEXT",
     "incidents_json": "TEXT",
     "analysis_json": "TEXT",
+    "jira_key": "TEXT",
+    "jira_url": "TEXT",
+    "component": "TEXT",              # the component that failed (e.g. 'spg')
+    "components_involved": "TEXT",    # comma-joined chain
+    "transaction_id": "TEXT",         # TID from multi-component logs
 }
 
 
@@ -134,6 +144,9 @@ class Database:
         response_status: Optional[str] = None,
         incidents_json: Optional[str] = None,
         analysis_json: Optional[str] = None,
+        component: Optional[str] = None,
+        components_involved: Optional[str] = None,
+        transaction_id: Optional[str] = None,
     ) -> None:
         """Insert or replace a processing record (idempotent on content_hash)."""
         with self._lock:
@@ -144,8 +157,9 @@ class Database:
                      status, report_path, error_message, processed_at,
                      summary, error_type, category, confidence, engine,
                      level, simple_explanation, endpoint, request_body, response_body,
-                     response_status, incidents_json, analysis_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     response_status, incidents_json, analysis_json,
+                     component, components_involved, transaction_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(content_hash) DO UPDATE SET
                     file_name=excluded.file_name,
                     source_path=excluded.source_path,
@@ -167,7 +181,10 @@ class Database:
                     response_body=excluded.response_body,
                     response_status=excluded.response_status,
                     incidents_json=excluded.incidents_json,
-                    analysis_json=excluded.analysis_json
+                    analysis_json=excluded.analysis_json,
+                    component=excluded.component,
+                    components_involved=excluded.components_involved,
+                    transaction_id=excluded.transaction_id
                 """,
                 (
                     file_name,
@@ -192,6 +209,9 @@ class Database:
                     response_status,
                     incidents_json,
                     analysis_json,
+                    component,
+                    components_involved,
+                    transaction_id,
                 ),
             )
             self._conn.commit()
@@ -248,6 +268,14 @@ class Database:
         with self._lock:
             rows = self._conn.execute(sql, tuple(params)).fetchall()
         return [dict(r) for r in rows]
+
+    def set_jira(self, report_id: int, jira_key: str, jira_url: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE processed_files SET jira_key = ?, jira_url = ? WHERE id = ?",
+                (jira_key, jira_url, report_id),
+            )
+            self._conn.commit()
 
     def get_report(self, report_id: int) -> Optional[dict]:
         with self._lock:

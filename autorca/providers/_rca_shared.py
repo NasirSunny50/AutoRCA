@@ -74,6 +74,8 @@ Guidance for "level" (pick the SINGLE best-fitting one):
 - Configuration    = missing or wrong configuration (absent env var/secret, bad property, unresolved placeholder, misconfigured bean/feature flag).
 
 Log statistics: total_lines={total_lines}, severities={severities}, correlation_ids={correlation_ids}.
+Components involved (request flowed through these services): {components_involved}
+FAILING component (the service that raised the error): {failing_component}
 Exception classes seen (first->last): {exception_classes}
 Caused-by chain (outer->root): {caused_by}
 
@@ -119,6 +121,8 @@ def build_prompt(digest: ErrorDigest, file_name: str) -> str:
         total_lines=digest.total_lines,
         severities=dict(digest.severities),
         correlation_ids=digest.correlation_ids[:5],
+        components_involved=", ".join(digest.components_involved) or "(n/a)",
+        failing_component=digest.failing_component or "(unknown)",
         exception_classes=digest.exception_classes[:10] or ["(none)"],
         caused_by=digest.caused_by_chain[:10] or ["(none)"],
         request_line=digest.request_line or "(none)",
