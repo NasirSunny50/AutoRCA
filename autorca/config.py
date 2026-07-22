@@ -42,11 +42,16 @@ class Config:
     timeout_seconds: float
     fallback_to_heuristic: bool
     gemini_api_key: str = ""
+    # Groq provider (OpenAI-compatible, fast free tier)
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
     # local LLM (Ollama) provider
     local_model: str = "qwen2.5-coder:7b"
     local_host: str = "http://localhost:11434"
     local_num_ctx: int = 8192
     local_timeout_seconds: float = 300.0
+    # order tried by the "chain" provider (auto failover between engines)
+    fallback_chain: list = field(default_factory=lambda: ["gemini", "groq", "local", "heuristic"])
     # jira integration (Jira Server/DC: basic auth username+password, API v2)
     jira_base_url: str = ""
     jira_user: str = ""
@@ -113,10 +118,14 @@ def load_config(config_path: str | os.PathLike | None = None) -> Config:
         timeout_seconds=float(ai.get("timeout_seconds", 60)),
         fallback_to_heuristic=bool(ai.get("fallback_to_heuristic", True)),
         gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
+        groq_api_key=os.getenv("GROQ_API_KEY", "").strip(),
+        groq_model=ai.get("groq_model", "llama-3.3-70b-versatile"),
         local_model=ai.get("local_model", "qwen2.5-coder:7b"),
         local_host=ai.get("local_host", "http://localhost:11434"),
         local_num_ctx=int(ai.get("local_num_ctx", 8192)),
         local_timeout_seconds=float(ai.get("local_timeout_seconds", 300)),
+        fallback_chain=[str(s).lower() for s in
+                        (ai.get("fallback_chain") or ["gemini", "groq", "local", "heuristic"])],
         jira_base_url=(os.getenv("JIRA_BASE_URL", jira.get("base_url", "")) or "").strip().rstrip("/"),
         jira_user=(os.getenv("JIRA_USERNAME") or os.getenv("JIRA_EMAIL") or "").strip(),
         jira_password=(os.getenv("JIRA_PASSWORD") or os.getenv("JIRA_API_TOKEN") or "").strip(),

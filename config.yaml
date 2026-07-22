@@ -29,16 +29,24 @@ processing:
   max_excerpt_chars: 16000
 
 ai:
-  # Provider: "gemini" | "local" | "heuristic"
+  # Provider: "chain" | "gemini" | "groq" | "local" | "heuristic"
+  #   chain     -> Auto Mode: try each engine in fallback_chain until one works
+  #                (Gemini -> Groq -> Local -> Heuristic). Best resilience.
   #   gemini    -> Google Gemini free tier (needs GEMINI_API_KEY in .env)
+  #   groq      -> Groq free tier, very fast (needs GROQ_API_KEY in .env)
   #   local     -> a model running locally via Ollama (no API key, no internet,
   #                no data leaves the machine). See the local_* settings below.
   #   heuristic -> offline rule engine, no API key, no internet, no model
   provider: "gemini"
+  # Order the "chain" provider tries engines. If Gemini hits its quota or is
+  # unreachable, Groq is tried, then the local model, then the rule engine.
+  fallback_chain: ["gemini", "groq", "local", "heuristic"]
   # Gemini model id (free tier). gemini-2.5-flash is current, strong & generous.
   # (Tip: if a model returns HTTP 429 "limit: 0", that model isn't enabled on
   #  your key's project — try gemini-flash-latest or gemini-2.5-flash-lite.)
   model: "gemini-2.5-flash"
+  # Groq model id (only used when provider: "groq" or in the chain).
+  groq_model: "llama-3.3-70b-versatile"
   # Request timeout in seconds
   timeout_seconds: 60
   # If the AI call fails, fall back to the offline heuristic engine

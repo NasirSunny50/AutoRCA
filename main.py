@@ -48,8 +48,11 @@ def main(argv=None) -> int:
     processor = Processor(config, db)
 
     active_provider, active_model = active_provider_model(config, db)
-    log.info("AutoRCA starting | engine=%s %s | watch=%s",
-             active_provider, active_model or "(rules)", config.watch_dir)
+    if active_provider == "chain":
+        engine_desc = "chain [" + " → ".join(config.fallback_chain) + "]"
+    else:
+        engine_desc = f"{active_provider} {active_model or '(rules)'}"
+    log.info("AutoRCA starting | engine=%s | watch=%s", engine_desc, config.watch_dir)
 
     try:
         if args.stats:

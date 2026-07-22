@@ -21,8 +21,10 @@ from .database import Database
 # Each option maps a friendly label to a (provider, model) pair.
 # `kind` is just for grouping/badge display in the UI.
 ENGINE_OPTIONS: List[Dict[str, str]] = [
+    {"id": "auto-chain",        "label": "Auto Mode",                "provider": "chain",     "model": "",                      "kind": "Auto"},
     {"id": "gemini-flash",      "label": "Gemini 2.5 Flash",         "provider": "gemini",    "model": "gemini-2.5-flash",      "kind": "Cloud"},
     {"id": "gemini-flash-lite", "label": "Gemini 2.5 Flash-Lite",    "provider": "gemini",    "model": "gemini-2.5-flash-lite", "kind": "Cloud"},
+    {"id": "groq-llama70b",     "label": "Groq Llama 3.3 70B",       "provider": "groq",      "model": "llama-3.3-70b-versatile", "kind": "Cloud"},
     {"id": "local-qwen7b",      "label": "Qwen2.5-Coder 7B (local)", "provider": "local",     "model": "qwen2.5-coder:7b",      "kind": "Local"},
     {"id": "local-qwen3b",      "label": "Qwen2.5-Coder 3B (local)", "provider": "local",     "model": "qwen2.5-coder:3b",      "kind": "Local"},
     {"id": "heuristic",         "label": "Offline heuristic (no AI)","provider": "heuristic", "model": "",                      "kind": "Offline"},
@@ -39,8 +41,12 @@ def active_provider_model(config: Config, db: Database) -> Tuple[str, str]:
     provider = (db.get_setting("active_provider") or config.provider).lower()
     if provider == "gemini":
         model = db.get_setting("active_model") or config.model
+    elif provider == "groq":
+        model = db.get_setting("active_model") or config.groq_model
     elif provider == "local":
         model = db.get_setting("active_model") or config.local_model
+    elif provider == "chain":
+        model = ""
     else:
         provider, model = "heuristic", ""
     return provider, model

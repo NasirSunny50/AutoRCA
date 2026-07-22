@@ -47,8 +47,12 @@ class Processor:
         if cached is None:
             if provider == "gemini":
                 cfg = replace(self.config, provider="gemini", model=model)
+            elif provider == "groq":
+                cfg = replace(self.config, provider="groq", groq_model=model)
             elif provider == "local":
                 cfg = replace(self.config, provider="local", local_model=model)
+            elif provider == "chain":
+                cfg = replace(self.config, provider="chain")
             else:
                 cfg = replace(self.config, provider="heuristic")
             cached = build_provider(cfg)
