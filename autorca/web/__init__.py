@@ -59,6 +59,39 @@ def _confidence_class(confidence: Optional[str]) -> str:
     )
 
 
+# Impact ranking for the levels that tend to hurt the most when they break.
+_HIGH_IMPACT_LEVELS = {"database", "server", "external service", "network"}
+_PRIORITY_LABELS = ["None", "Low", "Medium", "High", "Critical"]
+_PRIORITY_CLASSES = ["pr-none", "pr-low", "pr-med", "pr-high", "pr-crit"]
+
+
+def _compute_priority(row: Dict[str, Any], incident_count: int) -> tuple:
+    """A single Priority verdict (label + css class) derived from level,
+    confidence, and how many times the failure occurred — so the busiest,
+    highest-impact issues surface first without anyone tagging them by hand."""
+    if row.get("status") == "failed":
+        return _PRIORITY_LABELS[4], _PRIORITY_CLASSES[4]  # Critical: AutoRCA itself couldn't analyze it
+    category = (row.get("category") or "").lower()
+    if category in ("no error", "n/a") and not row.get("level"):
+        return _PRIORITY_LABELS[0], _PRIORITY_CLASSES[0]
+
+    level = (row.get("level") or "").lower()
+    confidence = (row.get("confidence") or "").lower()
+
+    score = 3 if level in _HIGH_IMPACT_LEVELS else 2
+    if confidence == "high":
+        score += 1
+    elif confidence == "low":
+        score -= 1
+    if incident_count >= 10:
+        score += 1
+    elif incident_count >= 3:
+        score += 0.5
+
+    idx = max(0, min(4, round(score)))
+    return _PRIORITY_LABELS[idx], _PRIORITY_CLASSES[idx]
+
+
 def _project_folders(config: Config) -> list:
     """Project names = the immediate sub-folders of the watch dir (minus 'processed')."""
     base = config.watch_dir
@@ -101,6 +134,16 @@ def _row_view(row: Dict[str, Any]) -> Dict[str, Any]:
             incidents = []
     view["incidents"] = incidents
     view["groups"] = _group_by_reason(incidents, analysis.get("reason_groups"))
+
+    incident_count = sum(i.get("count", 1) for i in incidents) or (1 if incidents else 0)
+    view["priority"], view["priority_class"] = _compute_priority(row, incident_count)
+
+    # One-line "what's actually wrong" gist for compact list rows: prefer the
+    # root cause (the "why"), fall back to the plain-English summary.
+    view["cause_gist"] = (
+        analysis.get("root_cause") or analysis.get("why_it_happened")
+        or row.get("summary") or row.get("error_message") or "No summary available"
+    )
 
     # short, display-friendly timestamp
     ts = row.get("processed_at") or ""

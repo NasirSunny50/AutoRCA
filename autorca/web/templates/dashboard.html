@@ -2,18 +2,32 @@
 {% block title %}Dashboard{% endblock %}
 
 {% macro report_row(r) %}
-  <a class="rrow" href="{{ url_for('report_detail', report_id=r.id) }}">
-    <div class="ic">{{ '⚠️' if r.status=='processed' and r.category not in ['no error','n/a'] else ('✅' if r.category=='no error' else ('💥' if r.status=='failed' else '📄')) }}</div>
-    <div class="meta">
-      <div class="name">{{ r.file_name }}</div>
-      <div class="sum">{{ r.summary or r.error_message or 'No summary' }}</div>
+  <div class="rrow2">
+    <a class="rrow2-main" href="{{ url_for('report_detail', report_id=r.id) }}">
+      <div class="ic">{{ '⚠️' if r.status=='processed' and r.category not in ['no error','n/a'] else ('✅' if r.category=='no error' else ('💥' if r.status=='failed' else '📄')) }}</div>
+      <div class="meta">
+        <div class="name">
+          <span class="name-text">{{ r.file_name }}</span>
+          {% if r.project %}<span class="proj-chip" title="Project">🏷️ {{ r.project }}</span>{% endif %}
+        </div>
+        <div class="cause">{{ r.cause_gist }}</div>
+      </div>
+      <span class="pr-badge {{ r.priority_class }}" title="Priority">{{ r.priority }}</span>
+      <span class="when">{{ r.processed_short }}</span>
+    </a>
+    <div class="jira-inline">
+      {% if r.jira_key %}
+        <a class="jira-chip done" href="{{ r.jira_url or '#' }}" target="_blank" rel="noopener"
+           title="Jira issue already created">✓ {{ r.jira_key }} ↗</a>
+      {% else %}
+        <button class="jira-chip create" type="button"
+                data-url="{{ url_for('create_jira', report_id=r.id) }}"
+                data-report-url="{{ url_for('report_detail', report_id=r.id) }}">
+          <span class="jira-ic">🅙</span> Jira
+        </button>
+      {% endif %}
     </div>
-    {% if r.project %}<span class="proj-chip" title="Project">🏷️ {{ r.project }}</span>{% endif %}
-    {% if r.level %}<span class="badge conf-na" title="Level">{{ level_icon(r.level) }} {{ r.level }}</span>{% endif %}
-    <span class="chip {{ r.category_class }}">{{ r.category_label }}</span>
-    <span class="badge {{ r.confidence_class }}">{{ r.confidence or 'n/a' }}</span>
-    <div class="when">{{ r.processed_short }}</div>
-  </a>
+  </div>
 {% endmacro %}
 
 {% block content %}
@@ -27,7 +41,7 @@
 
 {% if projects %}
 <div class="proj-tabs reveal d1">
-  <a class="proj-tab {{ 'on' if not active_project }}" href="{{ url_for('dashboard') }}">🗂️ All Projects</a>
+  <a class="proj-tab {{ 'on' if not active_project }}" href="{{ url_for('dashboard') }}">All Projects</a>
   {% for p in projects %}
     <a class="proj-tab {{ 'on' if active_project == p }}" href="{{ url_for('dashboard', project=p) }}">{{ p }}</a>
   {% endfor %}
@@ -70,41 +84,39 @@
   </div>
 </div>
 
-<div class="cols">
-  <div class="panel reveal d3">
-    <h2>🕑 Recent Analyses <span class="count">{{ recent|length }} shown</span></h2>
-    <div class="body">
-      {% if recent %}
-        <div class="rlist">
-          {% for r in recent %}{{ report_row(r) }}{% endfor %}
-        </div>
-      {% else %}
-        <div class="empty">
-          <div class="big">📭</div>
-          <p>No analyses{{ ' for %s' % active_project if active_project }} yet. Drop a log into a project folder
-             (e.g. <code>Error Log File/Nagad/</code>) and start the monitor with <code>python main.py</code>.</p>
-        </div>
-      {% endif %}
-    </div>
-  </div>
-
-  <div style="display:flex; flex-direction:column; gap:18px;">
-    <div class="panel reveal d4">
-      <h2>🧭 By Level</h2>
-      <div class="body">
-        {% set total_lvl = stats.by_level.values()|sum %}
-        {% if total_lvl %}
-          {% for name, icon, cls in LEVELS %}
-            {% set n = stats.by_level.get(name, 0) %}
-            <div class="bar-row">
-              <div class="top"><span>{{ icon }} {{ name }}</span><span class="n">{{ n }}</span></div>
-              <div class="bar"><span style="--w: {{ (n / total_lvl * 100)|round(0,'floor') if total_lvl else 0 }}%"></span></div>
-            </div>
-          {% endfor %}
-        {% else %}<div class="empty" style="padding:24px"><p>No data yet.</p></div>{% endif %}
+{% set total_lvl = stats.by_level.values()|sum %}
+<div class="panel reveal d3">
+  <h2>🧭 Issues by Level</h2>
+  <div class="body">
+    {% if total_lvl %}
+      <div class="level-strip">
+        {% for name, icon, cls in LEVELS %}
+          {% set n = stats.by_level.get(name, 0) %}
+          <div class="level-tile {{ cls }} {{ 'zero' if not n }}">
+            <div class="lt-top"><span class="lt-ic">{{ icon }}</span><span class="lt-n">{{ n }}</span></div>
+            <div class="lt-name">{{ name }}</div>
+            <div class="lt-bar"><span style="--w: {{ (n / total_lvl * 100)|round(0,'floor') if total_lvl else 0 }}%"></span></div>
+          </div>
+        {% endfor %}
       </div>
-    </div>
+    {% else %}<div class="empty" style="padding:20px"><p>No data yet.</p></div>{% endif %}
+  </div>
+</div>
 
+<div class="panel reveal d4" style="margin-top:18px">
+  <h2>🕑 Recent Analyses <span class="count">{{ recent|length }} shown</span></h2>
+  <div class="body">
+    {% if recent %}
+      <div class="rlist">
+        {% for r in recent %}{{ report_row(r) }}{% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <div class="big">📭</div>
+        <p>No analyses yet. Drop a log into a project folder
+           (e.g. <code>Error Log File/Nagad/</code>) and start the monitor with <code>python main.py</code>.</p>
+      </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
@@ -136,7 +148,53 @@
     upd(); setInterval(upd, 1000);
   })();
 
-  // Gently auto-refresh so new analyses appear on their own.
-  setTimeout(function(){ location.reload(); }, 20000);
+  // Inline "Create Jira Issue" button on each Recent Analyses row.
+  (function(){
+    var toast = document.getElementById('engineToast');
+    var toastTimer, pending = false;
+    function showToast(msg, ok){
+      if(!toast) return;
+      toast.textContent = msg;
+      toast.className = 'engine-toast show' + (ok === false ? ' err' : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function(){ toast.className = 'engine-toast'; }, 5000);
+    }
+    document.addEventListener('click', function(ev){
+      var btn = ev.target.closest('.jira-chip.create');
+      if(!btn) return;
+      ev.preventDefault();
+      var label = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="jira-ic">⏳</span> …';
+      pending = true;
+      fetch(btn.getAttribute('data-url'), {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          pending = false;
+          if(d.ok && d.key){
+            var link = document.createElement('a');
+            link.className = 'jira-chip done';
+            link.href = d.url || '#'; link.target = '_blank'; link.rel = 'noopener';
+            link.title = 'Jira issue already created';
+            link.textContent = '✓ ' + d.key + ' ↗';
+            btn.replaceWith(link);
+            showToast('Jira issue ' + d.key + ' created' + (d.log_attached ? ' with log attached' : ''), true);
+          } else if(d.ok && d.already){
+            showToast('Issue already exists: ' + d.key, true);
+          } else {
+            btn.disabled = false; btn.innerHTML = label;
+            var msg = (d.error || 'unknown error');
+            var needsComponent = /component/i.test(msg);
+            showToast(needsComponent
+              ? 'Could not auto-pick a component — open the report to choose one'
+              : 'Could not create issue: ' + msg, false);
+          }
+        })
+        .catch(function(){ pending = false; btn.disabled = false; btn.innerHTML = label; showToast('Network error creating issue', false); });
+    });
+
+    // Gently auto-refresh so new analyses appear on their own (skip mid-click).
+    setTimeout(function(){ if(!pending) location.reload(); }, 20000);
+  })();
 </script>
 {% endblock %}

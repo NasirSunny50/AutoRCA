@@ -288,6 +288,102 @@ code, pre, .mono { font-family: var(--mono); }
 .rrow:hover { background: var(--card-2); border-color: var(--border-2); transform: translateX(2px); }
 .rrow:hover::before { width:3px; }
 
+/* ---------- dashboard "Recent Analyses" row (v2: cause gist + priority + inline Jira) ---------- */
+.rrow2 {
+  display:flex; align-items:center; gap:10px; padding:12px; border-radius:11px;
+  position:relative; transition:.15s; border:1px solid transparent;
+}
+.rrow2::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:0;
+  border-radius:999px; background: var(--accent); box-shadow:0 0 10px var(--glow); transition:.16s; }
+.rrow2:hover { background: var(--card-2); border-color: var(--border-2); }
+.rrow2:hover::before { width:3px; }
+.rrow2-main { flex:1; min-width:0; display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit; }
+.rrow2-main .ic {
+  width:40px; height:40px; border-radius:10px; flex:none; display:grid; place-items:center;
+  font-size:18px; background: var(--bg-soft); border:1px solid var(--border);
+}
+.rrow2-main .meta { min-width:0; flex:1; }
+.rrow2-main .meta .name { display:flex; align-items:center; gap:8px; }
+.rrow2-main .meta .name-text {
+  font-family: var(--mono); font-weight:700; font-size:13px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.rrow2-main .meta .cause {
+  color: var(--muted); font-size:13px; margin-top:3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.rrow2-main .when {
+  color: var(--muted-2); font-size:11.5px; white-space:nowrap; flex:none;
+  width:150px; text-align:right; font-family: var(--mono);
+}
+
+/* fixed-width columns so priority pills line up vertically */
+.pr-badge {
+  flex:none; width:82px; display:inline-flex; align-items:center; justify-content:center;
+  font-family: var(--mono); font-size:10.5px; font-weight:800; letter-spacing:.04em;
+  text-transform:uppercase; padding:6px 0; border-radius:7px; white-space:nowrap;
+}
+.pr-none { color: var(--muted-2); background: rgba(138,151,171,.10); }
+.pr-low  { color: var(--green); background: rgba(52,226,155,.12); }
+.pr-med  { color: var(--amber); background: rgba(255,194,75,.13); }
+.pr-high { color: #ff8a4c; background: rgba(255,138,76,.15); }
+.pr-crit { color:#fff; background: linear-gradient(135deg,#ff5c7a,#c93b56); box-shadow:0 3px 10px rgba(255,92,122,.3); }
+
+.jira-inline { flex:none; width:132px; display:flex; justify-content:flex-end; margin-left:2px; }
+.jira-chip {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px; height:32px;
+  min-width:120px; padding:0 13px; border-radius:8px;
+  font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap; border:0; text-decoration:none;
+}
+.jira-chip.create { background: linear-gradient(135deg,#2684ff,#0052cc); color:#fff; box-shadow:0 3px 10px rgba(38,132,255,.3); }
+.jira-chip.create:hover { filter:brightness(1.08); }
+.jira-chip.create:disabled { opacity:.6; cursor:progress; }
+.jira-chip.done { color: var(--green); background: rgba(52,226,155,.14); border:1px solid rgba(52,226,155,.4); }
+html[data-theme="light"] .jira-chip.done { color:#0a7f57; }
+.jira-chip .jira-ic { font-size:13px; line-height:1; }
+
+@media (max-width: 760px) {
+  .rrow2-main .when { display:none; }
+  .rrow2 { flex-wrap:wrap; }
+}
+
+/* ---------- "Issues by Level" horizontal strip ---------- */
+.level-strip {
+  display:grid; grid-template-columns: repeat(6, 1fr); gap:12px;
+}
+@media (max-width: 900px){ .level-strip { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 520px){ .level-strip { grid-template-columns: repeat(2, 1fr); } }
+.level-tile {
+  --lc: var(--accent);
+  background: var(--bg-soft); border:1px solid var(--border); border-radius:12px;
+  padding:12px 13px; position:relative; overflow:hidden; transition:.15s;
+}
+.level-tile::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--lc); opacity:.9; }
+.level-tile:hover { border-color: var(--border-2); transform: translateY(-2px); }
+.level-tile.zero { opacity:.5; }
+.level-tile .lt-top { display:flex; align-items:center; justify-content:space-between; }
+.level-tile .lt-ic { font-size:17px; line-height:1; }
+.level-tile .lt-n {
+  font-family: var(--mono); font-size:24px; font-weight:700; line-height:1; color: var(--lc);
+  font-variant-numeric: tabular-nums;
+}
+.level-tile .lt-name {
+  font-size:11.5px; font-weight:700; color: var(--muted); margin-top:8px; margin-bottom:8px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.level-tile .lt-bar { height:5px; border-radius:999px; background: var(--card-2); overflow:hidden; }
+.level-tile .lt-bar > span {
+  display:block; height:100%; border-radius:999px; background: var(--lc);
+  width:0; animation: barFill 1.1s cubic-bezier(.22,1,.36,1) forwards;
+}
+.level-tile.lv-app    { --lc:#f0506e; }
+.level-tile.lv-server { --lc:#d8a217; }
+.level-tile.lv-db     { --lc:#2bb8c4; }
+.level-tile.lv-net    { --lc:#9b6dff; }
+.level-tile.lv-ext    { --lc:#38e0ff; }
+.level-tile.lv-cfg    { --lc:#ffc24b; }
+@media (prefers-reduced-motion: reduce) { .level-tile .lt-bar > span { animation:none; width: var(--w,0%); } }
+
 /* ---------- report actions bar + Jira button ---------- */
 .report-actions { display:flex; align-items:center; gap:12px; margin: 4px 0 14px; }
 .report-actions .back { margin:0; }
