@@ -62,6 +62,8 @@ class Config:
     jira_assignee_service: str = ""       # everything else (service issues)
     jira_bug_type: str = "Bug"
     jira_improvement_type: str = "Improvement"
+    # portal
+    health_checker_url: str = "http://localhost:5001"
     # logging
     log_level: str = "INFO"
     log_file: Path = field(default_factory=lambda: PROJECT_ROOT / "autorca_service.log")
@@ -135,6 +137,7 @@ def load_config(config_path: str | os.PathLike | None = None) -> Config:
         jira_assignee_service=(jira.get("assignee_service", "") or "").strip(),
         jira_bug_type=jira.get("bug_type", "Bug"),
         jira_improvement_type=jira.get("improvement_type", "Improvement"),
+        health_checker_url=(raw.get("health_checker_url") or "http://localhost:5001").strip(),
         log_level=log.get("level", "INFO").upper(),
         log_file=_resolve(log.get("file", "autorca_service.log")),
     )

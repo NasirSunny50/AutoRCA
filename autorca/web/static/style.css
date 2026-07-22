@@ -347,6 +347,35 @@ html[data-theme="light"] .jira-chip.done { color:#0a7f57; }
   .rrow2 { flex-wrap:wrap; }
 }
 
+/* ---------- Health Checker button (dashboard hero) ---------- */
+.hero-row { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+.hc-btn {
+  position:relative; overflow:hidden; flex:none;
+  display:inline-flex; align-items:center; gap:12px; padding:11px 18px 11px 15px;
+  border-radius:13px; text-decoration:none; color:#eafff6;
+  background: linear-gradient(135deg, rgba(52,226,155,.16), rgba(56,224,255,.12));
+  border:1px solid rgba(52,226,155,.4);
+  box-shadow: 0 6px 22px rgba(52,226,155,.18); transition:.16s;
+}
+.hc-btn:hover { transform: translateY(-2px); border-color: rgba(52,226,155,.7);
+  box-shadow: 0 10px 28px rgba(52,226,155,.28); }
+.hc-btn .hc-ic { font-size:20px; line-height:1; }
+.hc-btn .hc-text { display:flex; flex-direction:column; line-height:1.15; font-weight:800; font-size:14px; letter-spacing:-.01em; }
+.hc-btn .hc-text small { font-weight:600; font-size:10.5px; letter-spacing:.04em;
+  color: var(--green); text-transform:uppercase; font-family:var(--mono); opacity:.85; }
+.hc-btn .hc-pulse {
+  position:absolute; left:11px; top:13px; width:9px; height:9px; border-radius:50%;
+  background: var(--green); box-shadow: 0 0 0 0 rgba(52,226,155,.6);
+  animation: hcPulse 1.8s infinite;
+}
+@keyframes hcPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(52,226,155,.55); }
+  70%  { box-shadow: 0 0 0 9px rgba(52,226,155,0); }
+  100% { box-shadow: 0 0 0 0 rgba(52,226,155,0); }
+}
+html[data-theme="light"] .hc-btn { color:#0a7f57; }
+@media (max-width: 620px){ .hero-row { flex-wrap:wrap; } }
+
 /* ---------- "Issues by Level" horizontal strip ---------- */
 .level-strip {
   display:grid; grid-template-columns: repeat(6, 1fr); gap:12px;

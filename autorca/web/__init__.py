@@ -207,6 +207,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
         return {
             "LEVELS": LEVELS, "level_icon": _level_icon, "cat_meta": _category_meta,
             "engine_options": ENGINE_OPTIONS, "active_engine": current,
+            "health_checker_url": config.health_checker_url,
         }
 
     @app.route("/")

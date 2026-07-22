@@ -87,6 +87,9 @@ jira:
   # Set to false only if the Jira server uses a self-signed TLS certificate.
   verify_ssl: true
 
+# URL of the standalone CMS Health Checker portal (button on the dashboard).
+health_checker_url: "http://localhost:5001"
+
 logging:
   level: "INFO"            # DEBUG | INFO | WARNING | ERROR
   file: "autorca_service.log"

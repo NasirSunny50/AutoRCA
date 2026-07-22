@@ -34,9 +34,19 @@
 {% set ok = stats.by_status.get('processed', 0) %}
 {% set failed = stats.by_status.get('failed', 0) %}
 {% set success_rate = (ok / stats.total * 100)|round(0,'floor') if stats.total else 0 %}
-<div class="hero reveal">
-  <h1>Dashboard <span class="live"><span class="dot"></span> live</span></h1>
-  <p>Real-time automated root-cause analysis of incoming error logs.</p>
+<div class="hero reveal hero-row">
+  <div>
+    <h1>Dashboard <span class="live"><span class="dot"></span> live</span></h1>
+    <p>Real-time automated root-cause analysis of incoming error logs.</p>
+  </div>
+  {% if health_checker_url %}
+  <a class="hc-btn" href="{{ health_checker_url }}" target="_blank" rel="noopener"
+     title="Open the CMS Health Checker in a new tab">
+    <span class="hc-pulse"></span>
+    <span class="hc-ic">🩺</span>
+    <span class="hc-text">Health Checker<small>component status ↗</small></span>
+  </a>
+  {% endif %}
 </div>
 
 {% if projects %}
