@@ -137,7 +137,8 @@ def load_config(config_path: str | os.PathLike | None = None) -> Config:
         jira_assignee_service=(jira.get("assignee_service", "") or "").strip(),
         jira_bug_type=jira.get("bug_type", "Bug"),
         jira_improvement_type=jira.get("improvement_type", "Improvement"),
-        health_checker_url=(raw.get("health_checker_url") or "http://localhost:5001").strip(),
+        health_checker_url=(os.getenv("HEALTH_CHECKER_URL")
+                            or raw.get("health_checker_url") or "http://localhost:5001").strip(),
         log_level=log.get("level", "INFO").upper(),
         log_file=_resolve(log.get("file", "autorca_service.log")),
     )
