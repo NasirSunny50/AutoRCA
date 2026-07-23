@@ -38,7 +38,15 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
   Where-Object { $_.CommandLine -match 'main\.py|webapp\.py|app\.py' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+  Where-Object { $_.CommandLine -match 'keep-awake\.ps1' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 2
+
+# Keep the PC awake so the links stay up even when it is locked.
+Start-Process -FilePath 'powershell.exe' `
+  -ArgumentList '-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',(Join-Path $PSScriptRoot 'keep-awake.ps1') `
+  -WindowStyle Hidden | Out-Null
 
 Write-Host "Starting AutoRCA monitor + health checker..."
 Start-Process -FilePath $py -ArgumentList 'main.py' -WorkingDirectory $root -WindowStyle Hidden | Out-Null

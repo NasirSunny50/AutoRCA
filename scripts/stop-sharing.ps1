@@ -5,6 +5,11 @@
 Write-Host "Closing Cloudflare tunnels..."
 Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
+Write-Host "Releasing keep-awake (PC can sleep again)..."
+Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+  Where-Object { $_.CommandLine -match 'keep-awake\.ps1' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
 Write-Host "Stopping AutoRCA monitor, portal, and health checker..."
 Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
   Where-Object { $_.CommandLine -match 'main\.py|webapp\.py|app\.py' } |
