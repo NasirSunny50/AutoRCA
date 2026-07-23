@@ -6,6 +6,8 @@
 <div class="report-actions">
   <a class="back" href="{{ url_for('reports') }}">← Back to all reports</a>
   <div class="ra-right">
+    <button id="viewLogBtn" class="btn ghost" type="button"
+            data-url="{{ url_for('raw_log', report_id=r.id) }}">📄 View Raw Log</button>
     {% if r.jira_key %}
       <a class="btn jira-btn done" href="{{ r.jira_url or '#' }}" target="_blank" rel="noopener"
          title="Jira issue already created">✓ {{ r.jira_key }} ↗</a>
@@ -185,6 +187,27 @@
     Engine: <b>{{ r.engine or 'n/a' }}</b>
   </div>
 </details>
+
+<!-- ============ RAW LOG VIEWER (modal) ============ -->
+<div id="logModal" class="logv-modal" hidden>
+  <div class="logv-panel">
+    <div class="logv-toolbar">
+      <span class="logv-title">📄 <b>{{ r.file_name }}</b></span>
+      <input id="logSearch" class="logv-search" placeholder="Search the log…" autocomplete="off" spellcheck="false">
+      <div class="logv-filters" id="logFilters">
+        <button class="lf on" data-lvl="all">All</button>
+        <button class="lf lf-err"  data-lvl="ERROR">Error</button>
+        <button class="lf lf-warn" data-lvl="WARN">Warn</button>
+        <button class="lf lf-info" data-lvl="INFO">Info</button>
+        <button class="lf lf-dbg"  data-lvl="DEBUG">Debug</button>
+      </div>
+      <button id="logWrap" class="logv-btn" type="button" title="Toggle line wrap">↩ Wrap</button>
+      <span id="logStats" class="logv-stats"></span>
+      <button id="logClose" class="logv-close" type="button" title="Close (Esc)">✕</button>
+    </div>
+    <div id="logBody" class="logv-body"></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -255,6 +278,116 @@
         })
         .catch(function(){ btn.disabled = false; btn.innerHTML = label; showToast('Network error creating issue', false); });
     });
+  })();
+
+  // ---------------- Raw log viewer (colored, searchable) ----------------
+  (function(){
+    var openBtn = document.getElementById('viewLogBtn');
+    var modal   = document.getElementById('logModal');
+    if(!openBtn || !modal) return;
+    // Move the modal out to <body> so it escapes the .wrap stacking context
+    // (otherwise the sticky top bar renders on top of the toolbar).
+    document.body.appendChild(modal);
+    var body    = document.getElementById('logBody');
+    var search  = document.getElementById('logSearch');
+    var stats   = document.getElementById('logStats');
+    var closeBtn= document.getElementById('logClose');
+    var wrapBtn = document.getElementById('logWrap');
+    var filters = document.getElementById('logFilters');
+    var loaded = false, activeLvl = 'all';
+
+    function esc(s){ return s.replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+
+    // Classify a line by severity for coloring + filtering.
+    function levelOf(line){
+      if(/\b(ERROR|FATAL|SEVERE|CRITICAL)\b/.test(line) || /Exception|\bat\s+[\w.$]+\(/.test(line)) return 'ERROR';
+      if(/\bWARN(ING)?\b/.test(line)) return 'WARN';
+      if(/\bDEBUG|TRACE\b/.test(line)) return 'DEBUG';
+      if(/\bINFO\b/.test(line)) return 'INFO';
+      return 'OTHER';
+    }
+
+    // Token coloring on an already HTML-escaped line.
+    function colorize(h){
+      return h
+        .replace(/^(\s*)(\[[a-z0-9_-]+\])/i, '$1<span class="t-comp">$2</span>')       // [component]
+        .replace(/\[(ERROR|FATAL|SEVERE|CRITICAL)\s*\]|\b(ERROR|FATAL|SEVERE|CRITICAL)\b/g, '<span class="t-err">$&</span>')
+        .replace(/\[(WARN(?:ING)?)\s*\]|\b(WARN(?:ING)?)\b/g, '<span class="t-warn">$&</span>')
+        .replace(/\[(INFO)\s*\]|\b(INFO)\b/g, '<span class="t-info">$&</span>')
+        .replace(/\[(DEBUG|TRACE)\s*\]|\b(DEBUG|TRACE)\b/g, '<span class="t-dbg">$&</span>')
+        .replace(/\b((?:C|T|U|M)ID)\[([^\]]*)\]/g, '<span class="t-id">$1[<span class="t-idv">$2</span>]</span>') // CID[..] TID[..]
+        .replace(/\b(POST|GET|PUT|DELETE|PATCH)\b/g, '<span class="t-method">$1</span>')
+        .replace(/\[(REQ|RES)\]/g, '<span class="t-http">[$1]</span>')
+        .replace(/(\s)([2]\d\d)(\s|$)/g, '$1<span class="t-2xx">$2</span>$3')
+        .replace(/(\s)([4]\d\d)(\s|$)/g, '$1<span class="t-4xx">$2</span>$3')
+        .replace(/(\s)([5]\d\d)(\s|$)/g, '$1<span class="t-5xx">$2</span>$3')
+        .replace(/\b([a-z_$][\w$]*\.){2,}[A-Z][\w$]*(?:Exception|Error|Throwable|Failure)\b/g, '<span class="t-exc">$&</span>')
+        .replace(/\b(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}[.\d]*)/g, '<span class="t-time">$1</span>'); // timestamps
+    }
+
+    var colored = [], lowers = [];   // per-line caches (built once)
+
+    function render(text){
+      var lines = text.split(/\r?\n/);
+      colored = []; lowers = [];
+      var html = '';
+      for(var i=0;i<lines.length;i++){
+        var lvl = levelOf(lines[i]);
+        var c = colorize(esc(lines[i]));
+        colored.push(c);
+        lowers.push(lines[i].toLowerCase());
+        html += '<div class="ll lv-'+lvl.toLowerCase()+'" data-lvl="'+lvl+'" data-i="'+i+'">'
+              + '<span class="lno">'+(i+1)+'</span><span class="lc">'+c+'</span></div>';
+      }
+      body.innerHTML = html;
+      applyFilter();
+    }
+
+    function applyFilter(){
+      var q = (search.value || '').toLowerCase();
+      var qEsc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var rx = q ? new RegExp('(' + qEsc + ')(?![^<]*>)', 'ig') : null;   // match outside HTML tags
+      var rows = body.children, shown = 0;
+      for(var k=0;k<rows.length;k++){
+        var row = rows[k], i = +row.getAttribute('data-i');
+        var okLvl = activeLvl === 'all' || row.getAttribute('data-lvl') === activeLvl;
+        var okQ = !q || lowers[i].indexOf(q) >= 0;
+        if(okLvl && okQ){
+          row.style.display = ''; shown++;
+          row.lastChild.innerHTML = rx ? colored[i].replace(rx, '<mark>$1</mark>') : colored[i];
+        } else {
+          row.style.display = 'none';
+        }
+      }
+      stats.textContent = shown + ' / ' + rows.length + ' lines';
+    }
+
+    function open(){
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+      if(!loaded){
+        loaded = true;
+        body.innerHTML = '<div class="logv-msg">Loading log…</div>';
+        fetch(openBtn.getAttribute('data-url'))
+          .then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); })
+          .then(function(t){ render(t); search.focus(); })
+          .catch(function(){ body.innerHTML = '<div class="logv-msg">Could not load the log file (it may have been deleted).</div>'; });
+      } else { search.focus(); }
+    }
+    function close(){ modal.hidden = true; document.body.style.overflow = ''; }
+
+    openBtn.addEventListener('click', open);
+    closeBtn.addEventListener('click', close);
+    modal.addEventListener('click', function(e){ if(e.target === modal) close(); });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !modal.hidden) close(); });
+    var st; search.addEventListener('input', function(){ clearTimeout(st); st = setTimeout(applyFilter, 120); });
+    filters.addEventListener('click', function(e){
+      var b = e.target.closest('.lf'); if(!b) return;
+      activeLvl = b.getAttribute('data-lvl');
+      [].forEach.call(filters.children, function(c){ c.classList.toggle('on', c === b); });
+      applyFilter();
+    });
+    wrapBtn.addEventListener('click', function(){ body.classList.toggle('wrap'); wrapBtn.classList.toggle('on'); });
   })();
 </script>
 {% endblock %}

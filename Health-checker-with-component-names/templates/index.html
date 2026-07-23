@@ -1,64 +1,147 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CMS Health Checker</title>
-<style>
-:root{--font-mono:'Courier New',monospace;--color-background-primary:#fff;--color-background-secondary:#faf9f3;--color-text-primary:#202124;--color-text-secondary:#626262;--color-border-secondary:#d8d8d8;--color-border-tertiary:#ececec;--color-border-info:#378ADD;--border-radius-md:6px}*{box-sizing:border-box;margin:0;padding:0}body{background:#454545;padding:30px}.wrap{max-width:1120px;margin:auto;background:#fff;padding:24px;font-family:var(--font-mono);color:var(--color-text-primary)}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:2px solid #378ADD;padding-bottom:10px}.title{font-size:18px}.tabs{display:flex;margin-bottom:1rem;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);overflow:hidden;width:fit-content}.tab{font-size:12px;padding:6px 18px;cursor:pointer;border:none;background:transparent;color:var(--color-text-secondary);font-family:var(--font-mono);border-right:0.5px solid var(--color-border-secondary)}.tab.active{background:var(--color-text-primary);color:var(--color-background-primary)}.panel{display:none}.panel.active{display:block}.field-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px}.field-row label{font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:4px}.field-row input,.field-row textarea{font-family:var(--font-mono);font-size:13px;padding:7px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:#fff;color:#111}.field-row textarea{width:100%;height:86px;line-height:1.5}.json-editor{font-family:var(--font-mono);font-size:12px;padding:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);width:100%;height:260px;line-height:1.6}.actions{display:flex;gap:8px;margin:1rem 0;align-items:center;flex-wrap:wrap}.btn{font-family:var(--font-mono);font-size:12px;padding:7px 16px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:#fff;color:#111;cursor:pointer}.btn:hover{background:#f4f4f4}.btn-primary{background:#111;color:#fff;border-color:#111}.btn:disabled{opacity:.45;cursor:not-allowed}.summary-bar{display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap}.scard{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 16px;min-width:90px;text-align:center}.scard .num{font-size:22px;font-weight:600}.scard .lbl{font-size:11px;color:var(--color-text-secondary)}.progress-bar{height:2px;background:#eee;margin-bottom:1rem;overflow:hidden}.progress-fill{height:100%;background:#378ADD;transition:width .3s}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}.card{background:#fff;border:0.5px solid #e8e8e8;border-left:3px solid #ddd;border-radius:6px;padding:12px 14px}.card.up{border-left-color:#639922}.card.down{border-left-color:#A32D2D}.card.checking{border-left-color:#BA7517}.card-header{display:flex;justify-content:space-between;gap:6px}.card-name{font-size:13px;font-weight:600;word-break:break-word}.card-port{font-size:11px;color:#626262;margin:3px 0 6px}.badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;height:fit-content}.badge-up{background:#EAF3DE;color:#3B6D11}.badge-down{background:#FCEBEB;color:#A32D2D}.badge-check{background:#FAEEDA;color:#854F0B}.badge-pend{background:#eee;color:#666}.url-text{font-size:10px;color:#666;word-break:break-all;margin-bottom:6px}.divider{border:none;border-top:.5px solid #eee;margin:6px 0}.row{display:flex;justify-content:space-between;gap:8px;margin-top:3px}.meta-key{font-size:11px;color:#626262}.meta-val{font-size:11px;text-align:right;font-weight:600;word-break:break-word}.parsed-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}.parsed-table th{text-align:left;padding:6px;color:#626262;border-bottom:.5px solid #ddd}.parsed-table td{padding:6px;border-bottom:.5px solid #eee}.log-section{margin-top:1rem;background:#faf9f3;border-radius:6px;padding:12px;max-height:140px;overflow:auto}.log-entry{font-size:11px;padding:2px 0;display:flex;gap:10px}.ok{color:#3B6D11}.err{color:#A32D2D}.warn{color:#854F0B}.json-err{font-size:11px;color:#A32D2D;min-height:16px}.hint{font-size:11px;color:#666}.filebox{border:1px dashed #bbb;padding:12px;border-radius:6px;margin-bottom:10px;background:#fafafa}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enterprise Health Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
-<body><div class="wrap">
-<div class="top"><div><div class="title">CMS Health Checker</div><div class="hint">Dynamic URL, ports, component list, and Postman collection upload</div></div><div id="runstate" class="hint"></div></div>
-<div class="tabs"><button class="tab active" onclick="switchTab('manual',this)">Manual</button><button class="tab" onclick="switchTab('upload',this)">Upload file</button><button class="tab" onclick="switchTab('json',this)">JSON config</button><button class="tab" onclick="switchTab('preview',this)">Preview <span id="preview-count"></span></button></div>
+<body>
+<nav class="navbar navbar-dark bg-primary shadow-sm">
+  <div class="container-fluid">
+    <div>
+      <span class="navbar-brand fw-semibold">Enterprise Health Dashboard</span>
+      <small class="text-white-50 d-block">Enterprise Service Health Monitoring</small>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-light btn-sm" id="themeBtn"><i class="fa-solid fa-moon"></i></button>
+      <button class="btn btn-warning btn-sm" id="checkAllBtn"><i class="fa-solid fa-rotate"></i> Check All</button>
+    </div>
+  </div>
+</nav>
 
-<div class="panel active" id="panel-manual">
-  <div class="field-row"><div><label>Base URL / IP</label><input id="baseUrl" value="http://10.88.250.42" style="width:260px"></div><div><label>Health path</label><input id="healthPath" value="/health" style="width:160px"></div><div><label>Timeout (ms)</label><input id="timeout" value="5000" type="number" style="width:110px"></div><div><label>Concurrency</label><input id="concurrency" value="5" type="number" style="width:90px"></div></div>
-  <div class="field-row"><div style="width:100%"><label>Ports — space, comma, or newline separated</label><textarea id="ports">40045 20085 20095 20035 20045 20115 10076 10077 15524 20006 20025 40015 20065 42005 40056 41005 40025 20015 20075 20055</textarea></div></div>
-  <div class="actions"><button class="btn btn-primary" onclick="applyManual()">Apply & preview</button><button class="btn" onclick="loadSampleNames()">Load sample names</button></div>
-</div>
+<main class="container-fluid py-3">
+  <div id="alertArea"></div>
 
-<div class="panel" id="panel-upload">
-  <div class="filebox"><label class="hint">Upload Postman collection JSON or component list JSON</label><br><br><input type="file" id="fileInput" accept=".json,application/json"><button class="btn" onclick="uploadFile()">Upload & preview</button><div id="uploadMsg" class="json-err"></div></div>
-</div>
+  <div class="row g-3 mb-3" id="summaryCards"></div>
 
-<div class="panel" id="panel-json">
-  <textarea class="json-editor" id="jsonInput" spellcheck="false">{
-  "baseUrl": "http://10.88.250.42",
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3"><label class="form-label">Search</label><input id="searchInput" class="form-control" placeholder="Component name"></div>
+        <div class="col-md-2"><label class="form-label">Project</label><select id="projectFilter" class="form-select"><option value="">All Projects</option></select></div>
+        <div class="col-md-2"><label class="form-label">Status</label><select id="statusFilter" class="form-select"><option value="">All Status</option><option>UP</option><option>DOWN</option><option>UNKNOWN</option></select></div>
+        <div class="col-md-2"><label class="form-label">Auto Refresh</label><select id="refreshInterval" class="form-select"><option value="0">Off</option><option value="10">10 sec</option><option value="30" selected>30 sec</option><option value="60">60 sec</option></select></div>
+        <div class="col-md-3 d-flex gap-2 flex-wrap">
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#projectModal"><i class="fa-solid fa-plus"></i> Project</button>
+          <button class="btn btn-outline-primary" type="button" onclick="openComponent()"><i class="fa-solid fa-plus"></i> Component</button>
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Export</button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="/api/export/excel">Excel</a></li>
+              <li><a class="dropdown-item" href="/api/export/pdf">PDF</a></li>
+              <li><a class="dropdown-item" href="/api/export/json">JSON</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="projectsArea"></div>
+</main>
+
+<div class="modal fade" id="projectModal" tabindex="-1"><div class="modal-dialog"><form class="modal-content" id="projectForm">
+  <div class="modal-header"><h5 class="modal-title">Project</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><input type="hidden" id="projectId"><div class="mb-3"><label class="form-label">Project Name</label><input class="form-control" id="projectName" required></div><div><label class="form-label">Color</label><input class="form-control form-control-color" type="color" id="projectColor" value="#0d6efd"></div></div>
+  <div class="modal-footer"><button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
+</form></div></div>
+
+<div class="modal fade" id="componentModal" tabindex="-1"><div class="modal-dialog modal-lg"><form class="modal-content" id="componentForm">
+  <div class="modal-header"><h5 class="modal-title">Component</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="componentId">
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label">Project</label><select id="componentProject" class="form-select" required></select></div>
+      <div class="col-md-6"><label class="form-label">Component Name</label><input id="componentName" class="form-control" required></div>
+      <div class="col-12"><label class="form-label">Health URL</label><input id="healthUrl" class="form-control" placeholder="http://server:8080/actuator/health" required></div>
+      <div class="col-md-6"><label class="form-label">Info URL (optional)</label><input id="infoUrl" class="form-control"></div>
+      <div class="col-md-6"><label class="form-label">Metrics URL (optional)</label><input id="metricsUrl" class="form-control"></div>
+      <div class="col-md-4"><label class="form-label">Authentication</label><select id="authType" class="form-select"><option value="none">None</option><option value="basic">Basic</option><option value="bearer">Bearer</option></select></div>
+      <div class="col-md-4"><label class="form-label">Username</label><input id="username" class="form-control"></div>
+      <div class="col-md-4"><label class="form-label">Password</label><input id="password" type="password" class="form-control"></div>
+      <div class="col-md-8"><label class="form-label">Bearer Token</label><input id="bearerToken" class="form-control"></div>
+      <div class="col-md-4"><label class="form-label">Timeout (sec)</label><input id="timeout" type="number" min="1" value="5" class="form-control"></div>
+      <div class="col-12"><label class="form-label">Custom Headers JSON</label><textarea id="customHeaders" class="form-control" rows="2" placeholder='{"X-API-Key":"value"}'></textarea></div>
+      <div class="col-12 form-check ms-2"><input id="enabled" type="checkbox" class="form-check-input" checked><label class="form-check-label">Enabled</label></div>
+    </div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
+</form></div></div>
+
+<div class="modal fade" id="jsonModal" tabindex="-1"><div class="modal-dialog modal-xl"><form class="modal-content" id="jsonForm">
+  <div class="modal-header"><h5 class="modal-title">Import JSON Configuration</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="jsonProjectId">
+    <div class="d-flex gap-2 flex-wrap mb-3">
+      <button type="button" class="btn btn-outline-primary" id="singleJsonBtn"><i class="fa-regular fa-file-code"></i> Upload JSON</button>
+      <button type="button" class="btn btn-outline-primary" id="multipleJsonBtn"><i class="fa-solid fa-files"></i> Upload Multiple JSON</button>
+      <button type="button" class="btn btn-outline-secondary" id="pasteJsonBtn"><i class="fa-solid fa-paste"></i> Paste JSON</button>
+      <a class="btn btn-outline-success" href="/api/import/sample"><i class="fa-solid fa-download"></i> Download Sample</a>
+      <button type="button" class="btn btn-outline-success" id="copySampleBtn"><i class="fa-regular fa-copy"></i> Copy Sample</button>
+    </div>
+    <input id="singleJsonFile" type="file" accept=".json,application/json" hidden>
+    <input id="multipleJsonFiles" type="file" accept=".json,application/json" multiple hidden>
+    <div class="upload-zone mb-3" id="jsonDropZone">
+      <i class="fa-solid fa-cloud-arrow-up fs-2 mb-2"></i>
+      <div class="fw-semibold">Drag & drop one or multiple JSON files here</div>
+      <div class="text-muted small">Only .json files are supported</div>
+    </div>
+    <div id="selectedJsonFiles" class="small mb-3 text-muted">No files selected</div>
+    <div class="collapse" id="manualJsonSection">
+      <label class="form-label">Manual JSON</label>
+      <textarea id="manualJson" class="form-control font-monospace" rows="11" placeholder="Paste one or multiple JSON configurations..."></textarea>
+      <div id="jsonValidationMessage" class="small mt-2"></div>
+    </div>
+    <div class="border rounded p-3 mt-3 bg-body-tertiary small">
+      <div class="fw-semibold mb-2">JSON Format</div>
+      <pre class="sample-json mb-0" id="sampleJsonPreview">{
+  "baseUrl": "http://10.88.250.202",
   "healthPath": "/health",
   "services": [
-    { "componentName": "Auth Service", "port": 20085 },
-    { "componentName": "Card Management", "port": 20095 }
+    {
+      "componentName": "Outbound Proxy",
+      "port": 24424
+    },
+    {
+      "componentName": "System Gateway",
+      "port": 20025
+    },
+    {
+      "componentName": "API Gateway",
+      "port": 20005
+    }
   ]
-}</textarea>
-  <div id="jsonErr" class="json-err"></div><div class="actions"><button class="btn btn-primary" onclick="applyJson()">Apply & preview</button><button class="btn" onclick="formatJson()">Format JSON</button></div>
-</div>
+}</pre>
+    </div>
+    <div class="mt-3">
+      <label class="form-label d-block">Import Mode</label>
+      <div class="form-check"><input class="form-check-input" type="radio" name="importMode" id="mergeMode" value="merge" checked><label class="form-check-label" for="mergeMode">Merge Existing Data</label></div>
+      <div class="form-check"><input class="form-check-input" type="radio" name="importMode" id="replaceMode" value="replace"><label class="form-check-label" for="replaceMode">Replace Existing Data</label></div>
+      <div class="form-text">Merge keeps existing services, updates duplicates, and appends new services. Replace replaces the selected project's configuration completely.</div>
+    </div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary"><i class="fa-solid fa-file-import"></i> Import JSON</button></div>
+</form></div></div>
 
-<div class="panel" id="panel-preview"><table class="parsed-table"><thead><tr><th>#</th><th>Component</th><th>Port</th><th>URL</th><th>Status</th></tr></thead><tbody id="previewBody"></tbody></table></div>
+<div class="modal fade" id="detailsModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Health Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><div id="detailsContent"></div></div>
+</div></div></div>
 
-<div class="actions"><button class="btn btn-primary" id="checkBtn" onclick="startCheck()">▷ Check all</button><button class="btn" onclick="clearAll()">↻ Clear</button><button class="btn" onclick="copyReport()">⧉ Copy report</button></div>
-<div class="progress-bar"><div class="progress-fill" id="progfill" style="width:0%"></div></div>
-<div class="summary-bar"><div class="scard"><div class="num" id="s-total">0</div><div class="lbl">total</div></div><div class="scard"><div class="num ok" id="s-up">0</div><div class="lbl">up</div></div><div class="scard"><div class="num err" id="s-down">0</div><div class="lbl">down</div></div><div class="scard"><div class="num" id="s-pct">—</div><div class="lbl">uptime %</div></div><div class="scard"><div class="num" id="s-avg">—</div><div class="lbl">avg ms</div></div></div>
-<div class="grid" id="cardgrid"></div><div class="log-section" id="logsec" style="display:none"><div class="hint">Activity log</div><div id="logbody"></div></div>
-</div>
-<script>
-let services=[],results={};
-function switchTab(name,btn){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+name).classList.add('active');btn.classList.add('active');if(name==='preview')refreshPreview()}
-function setPreviewTab(){document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===3));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-preview').classList.add('active')}
-function portFromUrl(url){try{return new URL(url).port||''}catch(e){return ''}}
-function addLog(msg,type=''){document.getElementById('logsec').style.display='block';let d=document.createElement('div');d.className='log-entry';d.innerHTML=`<span>${new Date().toLocaleTimeString('en-GB')}</span><span class="${type}">${msg}</span>`;document.getElementById('logbody').prepend(d)}
-function applyManual(){let base=document.getElementById('baseUrl').value.trim().replace(/\/+$/,'');let path=document.getElementById('healthPath').value.trim()||'/health';if(!path.startsWith('/'))path='/'+path;let ports=document.getElementById('ports').value.split(/[\s,]+/).map(x=>x.trim()).filter(Boolean);services=ports.map(p=>({componentName:'Component '+p,port:p,url:`${base}:${p}${path}`}));refreshPreview();renderCards();setPreviewTab();addLog(`Applied ${services.length} manual services`,'ok')}
-function loadSampleNames(){let names=['Auth Service','Card Management','Transaction Engine','Settlement','Notification','Gateway A','Gateway B','Core Banking','Account Service','Limit Service','Fraud Engine','Token Service','Reporting','Batch Processor','HSM Interface','Card Controls','User Management','Inquiry API','Clearing','Admin Portal'];let ports=document.getElementById('ports').value.split(/[\s,]+/).filter(Boolean);let base=document.getElementById('baseUrl').value.trim().replace(/\/+$/,'');let path=document.getElementById('healthPath').value.trim()||'/health';services=ports.map((p,i)=>({componentName:names[i]||('Component '+p),port:p,url:`${base}:${p}${path}`}));refreshPreview();renderCards();setPreviewTab()}
-async function uploadFile(){let f=document.getElementById('fileInput').files[0];if(!f){document.getElementById('uploadMsg').textContent='Please choose a JSON file';return}let fd=new FormData();fd.append('file',f);let r=await fetch('/api/parse-file',{method:'POST',body:fd});let j=await r.json();if(!j.ok){document.getElementById('uploadMsg').textContent=j.error;return}services=j.services.map(s=>({componentName:s.componentName||s.requestName||'Service',port:s.port||portFromUrl(s.url),url:s.url}));document.getElementById('uploadMsg').textContent='';refreshPreview();renderCards();setPreviewTab();addLog(`Uploaded file parsed: ${services.length} services`,'ok')}
-function applyJson(){try{let j=JSON.parse(document.getElementById('jsonInput').value);let base=(j.baseUrl||'').replace(/\/+$/,'');let path=j.healthPath||'/health';if(!path.startsWith('/'))path='/'+path;let arr=j.services||j.components||j.endpoints||[];services=arr.map((s,i)=>({componentName:s.componentName||s.name||`Service ${i+1}`,port:s.port||portFromUrl(s.url),url:s.url||(base+':'+s.port+path)}));document.getElementById('jsonErr').textContent='';refreshPreview();renderCards();setPreviewTab();addLog(`JSON applied: ${services.length} services`,'ok')}catch(e){document.getElementById('jsonErr').textContent=e.message}}
-function formatJson(){try{jsonInput.value=JSON.stringify(JSON.parse(jsonInput.value),null,2);jsonErr.textContent=''}catch(e){jsonErr.textContent='Invalid JSON'}}
-function refreshPreview(){let tb=document.getElementById('previewBody');tb.innerHTML='';services.forEach((s,i)=>{let r=results[s.url];let state=r?r.state:'pending';tb.innerHTML+=`<tr><td>${i+1}</td><td>${s.componentName}</td><td>:${s.port||portFromUrl(s.url)}</td><td>${s.url}</td><td>${state}</td></tr>`});document.getElementById('preview-count').textContent=services.length?`(${services.length})`:'';updateSummary()}
-function renderCards(){let g=document.getElementById('cardgrid');g.innerHTML='';services.forEach(s=>{g.innerHTML+=`<div class="card" id="card-${btoa(s.url).replace(/=/g,'')}"><div class="card-header"><div><div class="card-name">${s.componentName}</div><div class="card-port">:${s.port||portFromUrl(s.url)}</div></div><span class="badge badge-pend">pending</span></div><div class="url-text">${s.url}</div><hr class="divider"><div class="row"><span class="meta-key">response time</span><span class="meta-val resp">—</span></div><div class="row"><span class="meta-key">HTTP status</span><span class="meta-val code">—</span></div><div class="row"><span class="meta-key">app / db</span><span class="meta-val appdb">—</span></div><div class="row"><span class="meta-key">redis / rabbit</span><span class="meta-val rr">—</span></div><div class="row"><span class="meta-key">last restart</span><span class="meta-val restart">—</span></div><div class="row"><span class="meta-key">restart source</span><span class="meta-val restartSource">—</span></div><div class="row"><span class="meta-key">build / git</span><span class="meta-val buildgit">—</span></div><div class="row"><span class="meta-key">checked at</span><span class="meta-val checked">—</span></div></div>`})}
-function cardId(url){return 'card-'+btoa(url).replace(/=/g,'')}
-async function checkOne(s){let c=document.getElementById(cardId(s.url));c.className='card checking';c.querySelector('.badge').className='badge badge-check';c.querySelector('.badge').textContent='…';let r=await fetch('/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...s,timeout:document.getElementById('timeout').value||5000})});let j=await r.json();results[s.url]=j;c.className='card '+j.state;c.querySelector('.badge').className='badge '+(j.state==='up'?'badge-up':'badge-down');c.querySelector('.badge').textContent=j.state.toUpperCase();c.querySelector('.resp').textContent=j.responseTimeMs?j.responseTimeMs+'ms':'—';c.querySelector('.code').textContent=j.httpStatus||j.message;c.querySelector('.appdb').textContent=`${j.application} / ${j.db}`;c.querySelector('.rr').textContent=`${j.redis} / ${j.rabbit}`;c.querySelector('.restart').textContent=j.restartAt||'not available';c.querySelector('.restartSource').textContent=j.restartSource||j.infoError||'not found';c.querySelector('.buildgit').textContent=(j.buildDate||'-')+' / '+(j.gitHash||'-');c.querySelector('.checked').textContent=j.checkedAt;let restartMsg=j.restartAt?' | restart '+j.restartAt:'';addLog(`${s.componentName}:${s.port||portFromUrl(s.url)} → ${j.state.toUpperCase()} ${j.responseTimeMs?j.responseTimeMs+'ms':''}${restartMsg}`,j.state==='up'?'ok':'err');updateSummary()}
-async function startCheck(){if(!services.length)applyManual();results={};renderCards();updateSummary();let btn=document.getElementById('checkBtn');btn.disabled=true;let conc=parseInt(document.getElementById('concurrency').value)||5;for(let i=0;i<services.length;i+=conc){await Promise.all(services.slice(i,i+conc).map(checkOne));document.getElementById('progfill').style.width=Math.round(Object.keys(results).length/services.length*100)+'%'}btn.disabled=false;let up=Object.values(results).filter(r=>r.state==='up').length;document.getElementById('runstate').textContent=`done — ${up}/${services.length} up`;refreshPreview()}
-function updateSummary(){let total=services.length, vals=Object.values(results), up=vals.filter(r=>r.state==='up').length, down=vals.filter(r=>r.state==='down').length, times=vals.filter(r=>r.responseTimeMs).map(r=>r.responseTimeMs);document.getElementById('s-total').textContent=total;document.getElementById('s-up').textContent=up;document.getElementById('s-down').textContent=down;document.getElementById('s-pct').textContent=vals.length?Math.round(up/vals.length*100)+'%':'—';document.getElementById('s-avg').textContent=times.length?Math.round(times.reduce((a,b)=>a+b,0)/times.length)+'ms':'—';document.getElementById('progfill').style.width=total?Math.round(vals.length/total*100)+'%':'0%'}
-function clearAll(){results={};document.getElementById('cardgrid').innerHTML='';document.getElementById('logbody').innerHTML='';document.getElementById('logsec').style.display='none';document.getElementById('runstate').textContent='';updateSummary();refreshPreview()}
-function copyReport(){let lines=['CMS Health Check Report',new Date().toISOString(),''];services.forEach(s=>{let r=results[s.url]||{};lines.push(`${(r.state||'PENDING').toUpperCase()} | ${s.componentName} | ${s.url} | ${r.responseTimeMs||'-'}ms | Restart: ${r.restartAt||'N/A'} | Source: ${r.restartSource||'N/A'} | ${r.message||''}`)});navigator.clipboard.writeText(lines.join('\n')).then(()=>addLog('Report copied','ok'))}
-applyManual();
-</script></body></html>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body></html>

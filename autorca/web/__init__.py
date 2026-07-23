@@ -9,13 +9,13 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from flask import Flask, abort, jsonify, render_template, request, send_file
+from flask import Flask, Response, abort, jsonify, render_template, request, send_file
 
 from ..config import Config, load_config
 from ..database import Database
 from ..engines import ENGINE_OPTIONS, active_engine, option_by_id
 from ..jira_client import (
-    JiraClient, JiraError, raise_issue_for_report, match_component,
+    JiraClient, JiraError, raise_issue_for_report, match_component, locate_log_file,
     decide_assignee as jira_decide_assignee,
     decide_issue_type as jira_decide_type,
 )
@@ -192,6 +192,16 @@ def create_app(config: Optional[Config] = None) -> Flask:
 
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["AUTORCA"] = config
+    # Don't let browsers/CDNs hold onto a stale style.css after an update.
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
+
+    def _asset_version() -> str:
+        """mtime of style.css — changes whenever the CSS does, so browsers
+        always fetch the latest instead of a stale cached copy."""
+        try:
+            return str(int((Path(__file__).parent / "static" / "style.css").stat().st_mtime))
+        except OSError:
+            return "1"
 
     def db() -> Database:
         # One connection per request keeps things simple and process-safe.
@@ -208,6 +218,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
             "LEVELS": LEVELS, "level_icon": _level_icon, "cat_meta": _category_meta,
             "engine_options": ENGINE_OPTIONS, "active_engine": current,
             "health_checker_url": config.health_checker_url,
+            "asset_version": _asset_version(),
         }
 
     @app.route("/")
@@ -309,6 +320,30 @@ def create_app(config: Optional[Config] = None) -> Flask:
             return jsonify({"ok": True, **result})
         finally:
             database.close()
+
+    @app.route("/report/<int:report_id>/rawlog")
+    def raw_log(report_id: int):
+        """Serve the original log file's text for the in-page log viewer."""
+        database = db()
+        try:
+            row = database.get_report(report_id)
+        finally:
+            database.close()
+        if not row:
+            return Response("Report not found.", status=404, mimetype="text/plain")
+        path = locate_log_file(config, _row_view(row))
+        if not path or not Path(path).exists():
+            return Response("Log file not found (it may have been deleted).",
+                            status=404, mimetype="text/plain")
+        try:
+            text = Path(path).read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            return Response(f"Could not read log: {exc}", status=500, mimetype="text/plain")
+        # Cap very large logs so the viewer stays responsive.
+        limit = 3_000_000
+        if len(text) > limit:
+            text = text[:limit] + "\n\n... [truncated — log too large to display fully]"
+        return Response(text, mimetype="text/plain")
 
     @app.route("/download/<int:report_id>")
     def download(report_id: int):

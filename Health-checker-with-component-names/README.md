@@ -1,21 +1,46 @@
-# Dynamic CMS Health Checker
+# Enterprise Health Dashboard - Simple Dynamic Version
+
+## Requirements
+- Python 3.12 or newer
+- Windows, Linux, or macOS
 
 ## Run
-```bash
-pip install -r requirements.txt
-python app.py
+1. Extract the ZIP.
+2. Open Terminal/PowerShell in the extracted folder.
+3. Create a virtual environment:
+   `python -m venv .venv`
+4. Activate it on PowerShell:
+   `.venv\Scripts\Activate.ps1`
+5. Install dependencies:
+   `pip install -r requirements.txt`
+6. Start:
+   `python app.py`
+7. Open:
+   `http://127.0.0.1:5001`
+
+## Dynamic configuration
+- Projects and components are stored in `dashboard.db`.
+- Add, edit, or delete them from the UI.
+- No source-code change is required.
+- Project-wise JSON import and export are supported.
+
+## Project JSON format
+```json
+{
+  "components": [
+    {
+      "name": "API Gateway",
+      "health_url": "http://server:8080/actuator/health",
+      "info_url": "http://server:8080/actuator/info",
+      "metrics_url": "http://server:8080/actuator/metrics",
+      "timeout": 5
+    }
+  ]
+}
 ```
-Open: http://127.0.0.1:5001
 
-## New restart-time feature
-The dashboard now checks restart/startup time in two ways:
-
-1. From `/health` response fields such as `startTime`, `startedAt`, `startupTime`, `upSince`, `uptime`, or nested Spring Boot style fields.
-2. If `/health` does not contain restart info, it automatically calls `/info` or `/actuator/info` for the same service and displays the restart time when available.
-
-It also shows restart source, build date, and git hash when `/info` provides them.
-
-## Input Options
-1. Manual base URL/IP + health path + ports
-2. Upload Postman collection JSON
-3. Upload component list JSON
+## Troubleshooting
+- `requirements.txt not found`: open the terminal inside the extracted project folder.
+- PowerShell activation blocked: run `Set-ExecutionPolicy -Scope Process Bypass` and activate again.
+- Port 5001 is busy: close the other process using that port.
+- Internal/private URLs must be reachable from the computer running this app.

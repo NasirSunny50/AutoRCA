@@ -33,3 +33,9 @@ venv/
 .idea/
 Thumbs.db
 .DS_Store
+
+# ---- Health Checker runtime/IDE files ----
+Health-checker-with-component-names/dashboard.db
+Health-checker-with-component-names/application.log
+Health-checker-with-component-names/.idea/
+Health-checker-with-component-names/.venv/
